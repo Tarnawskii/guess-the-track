@@ -210,6 +210,18 @@
   .field.bad .v::before { content: "✗"; }
   .shake { animation: shake 360ms var(--ease); }
   @keyframes shake { 20% { transform: translateX(-0.375rem); } 40% { transform: translateX(0.3125rem); } 60% { transform: translateX(-0.25rem); } 80% { transform: translateX(0.125rem); } }
+  #choices { display: none; flex-direction: column; gap: 0.4375rem; }
+  #app.pick #choices { display: flex; }
+  #app.pick .field { display: none; }
+  #app.pick #check { display: none; }
+  #choiceLabel { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); text-align: center; min-height: 0.75rem; }
+  #choiceList { display: flex; flex-direction: column; gap: 0.375rem; }
+  #choiceList button { min-height: 2.25rem; text-align: left; padding: 0 0.75rem; line-height: 1.2; }
+  #choiceList button.pick-ok { background: rgba(168, 224, 99, 0.16); color: var(--ok); }
+  #choiceList button.pick-bad { background: rgba(255, 90, 79, 0.16); color: var(--bad); }
+  #choiceList button.pick-right { box-shadow: inset 0 0 0 2px var(--ok); color: var(--ok); }
+  #choiceList button:disabled { opacity: 0.45; }
+  #choiceList button.pick-ok:disabled, #choiceList button.pick-bad:disabled, #choiceList button.pick-right:disabled { opacity: 1; }
   .actions { display: flex; gap: 0.5rem; }
   .actions button { flex: 1; letter-spacing: 0.04em; }
   #check {
@@ -250,8 +262,11 @@
   </header>
   <div class="seg" role="group" aria-label="Source">
     <button data-mode="spotify" aria-pressed="false">Spotify</button>
-    <button data-mode="soloist" aria-pressed="false">Soloist</button>
     <button data-mode="demo" aria-pressed="false">Demo</button>
+  </div>
+  <div class="seg" role="group" aria-label="Guess style">
+    <button data-imode="type" aria-pressed="true">Type</button>
+    <button data-imode="pick" aria-pressed="false">Pick 5</button>
   </div>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span></div>
   <div class="stage" id="stage">
@@ -274,6 +289,10 @@
   <label class="field" id="fArtist"><input id="gArtist" placeholder="Artist" aria-label="Artist" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
   <label class="field" id="fSong"><input id="gSong" placeholder="Song" aria-label="Song" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
   <label class="field" id="fYear"><input id="gYear" placeholder="Year" aria-label="Year" inputmode="numeric" maxlength="4" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
+  <div id="choices" role="group" aria-label="Choices">
+    <div id="choiceLabel"></div>
+    <div id="choiceList"></div>
+  </div>
   <div class="actions">
     <button id="check">Check</button>
     <button id="reveal">Reveal</button>
@@ -286,7 +305,6 @@
 <script>
 const CONFIG = {
   spotifyClientId: "fb91c824fe804c50a8b4b244288ebc6f",
-  soloistWs: "ws://127.0.0.1:9090",
   redirectUri: location.origin + location.pathname,
   scopes: "user-read-currently-playing user-read-playback-state",
   pollMs: 5000,
@@ -295,6 +313,8 @@ const CONFIG = {
 
 const state = {
   mode: "idle",
+  imode: "type", choicesFailed: false,
+  choice: { stage: 0, opts: null, accepted: null, results: [] },
   track: null,
   trackKey: null,
   revealed: false,
@@ -325,12 +345,12 @@ const els = {
   sPoints: $("sPoints"), sStreak: $("sStreak"), sRounds: $("sRounds"),
   stPoints: $("stPoints"), stStreak: $("stStreak"),
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
-  pipBtn: $("pipBtn"), segs: document.querySelectorAll(".seg button"),
+  pipBtn: $("pipBtn"), segs: document.querySelectorAll("[data-mode]"),
+  imodes: document.querySelectorAll("[data-imode]"),
+  choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
-
-if (location.protocol === "https:") document.querySelector('[data-mode="soloist"]').hidden = true;
 
 function setConn(cls, text) {
   els.led.className = "led " + cls;
@@ -457,7 +477,8 @@ function burst() {
 }
 
 function newRound(track, key) {
-  state.track = track; state.trackKey = key; state.revealed = false;
+  state.track = track; state.trackKey = key; state.revealed = false; state.choicesFailed = false;
+  applyInputUI();
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   els.answer.style.display = "none"; els.answer.textContent = "";
   els.answer.classList.remove("pop");
@@ -465,41 +486,32 @@ function newRound(track, key) {
   els.cover.classList.remove("flipped");
   els.stage.classList.add("live");
   setStatus("new track — guess!");
-  if (els.app.ownerDocument.hasFocus()) els.artist.focus();
-  const isAlbum = track.third.label === "album";
-  els.year.placeholder = isAlbum ? "Album" : "Year";
-  els.year.setAttribute("aria-label", els.year.placeholder);
-  if (isAlbum) { els.year.removeAttribute("maxlength"); els.year.removeAttribute("inputmode"); }
-  else { els.year.setAttribute("maxlength", "4"); els.year.setAttribute("inputmode", "numeric"); }
+  if (!els.app.classList.contains("pick") && els.app.ownerDocument.hasFocus()) els.artist.focus();
+  setupChoices(track);
 }
 
 function answerText() {
   const t = state.track;
-  const third = t.third.label === "year" ? `(${t.third.answer})` : `— ${t.third.answer}`;
-  return `${t.artists.join(", ")} — "${t.song}" ${third}`;
+  return `${t.artists.join(", ")} — "${t.song}" (${t.third.answer})`;
 }
 
 function check() {
   if (!state.track || state.revealed) return;
+  if (usingPick()) return;
   const t = state.track;
   const aOk = fuzzyMatch(els.artist.value, t.artists);
   const sOk = fuzzyMatch(els.song.value, [t.song]);
   let thirdOk = null, earned = 0;
-  if (t.third.label === "album") {
-    thirdOk = fuzzyMatch(els.year.value, [t.third.answer]);
-    if (thirdOk) earned += 1;
-  } else {
-    const yv = parseInt(els.year.value, 10);
-    if (!isNaN(yv)) {
-      const diff = Math.abs(yv - t.third.answer);
-      if (diff === 0) { thirdOk = "ok"; earned += 2; }
-      else if (diff <= 2) { thirdOk = "close"; earned += 1; }
-      else thirdOk = "bad";
-    }
+  const yv = parseInt(els.year.value, 10);
+  if (!isNaN(yv)) {
+    const diff = Math.abs(yv - t.third.answer);
+    if (diff === 0) { thirdOk = "ok"; earned += 2; }
+    else if (diff <= 2) { thirdOk = "close"; earned += 1; }
+    else thirdOk = "bad";
   }
   if (aOk) earned += 1;
   if (sOk) earned += 1;
-  const thirdVerdict = thirdOk === true ? "ok" : thirdOk === false || thirdOk === null ? "bad" : thirdOk;
+  const thirdVerdict = thirdOk === null ? "bad" : thirdOk;
   setVerdict(els.fArtist, aOk ? "ok" : "bad");
   setVerdict(els.fSong, sOk ? "ok" : "bad");
   setVerdict(els.fYear, thirdVerdict);
@@ -528,6 +540,7 @@ function finish(msg, win) {
   els.answer.style.display = "block";
   els.answer.classList.add("pop");
   fields.forEach((f) => { f.querySelector("input").readOnly = true; });
+  for (const b of els.choiceList.querySelectorAll("button")) b.disabled = true;
   if (state.track.artUrl) {
     const img = document.createElement("img");
     img.src = state.track.artUrl;
@@ -545,9 +558,200 @@ function reveal() {
   finish("revealed — 0 points");
 }
 
+let choiceSeq = 0;
+const albumCache = new Map();
+
+// pick mode: sequential multiple choice — artist, then song, then year
+function usingPick() {
+  return state.imode === "pick" && !state.choicesFailed;
+}
+
+function applyInputUI() {
+  els.app.classList.toggle("pick", usingPick());
+}
+
+function setImode(imode) {
+  if (state.imode === imode) return;
+  state.imode = imode;
+  state.choicesFailed = false;
+  choiceSeq++;
+  els.imodes.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.imode === imode)));
+  els.artist.value = ""; els.song.value = ""; els.year.value = "";
+  fields.forEach((f) => setVerdict(f, null));
+  state.choice = { stage: 0, opts: null, accepted: null, results: [] };
+  els.choiceList.replaceChildren();
+  els.choiceLabel.textContent = "";
+  if (imode === "pick" && state.track && !state.revealed) { setupChoices(state.track); return; }
+  applyInputUI();
+  if (imode === "pick") setStatus("pick mode on — options come with the next track");
+}
+
+function setupChoices(track) {
+  applyInputUI();
+  state.choice = { stage: 0, opts: null, accepted: null, results: [] };
+  els.choiceList.replaceChildren();
+  if (state.imode !== "pick" || !track || state.revealed) { els.choiceLabel.textContent = ""; return; }
+  const seq = ++choiceSeq;
+  els.choiceLabel.textContent = "loading choices…";
+  const ready = state.mode === "spotify" ? fetchSpotifyPools(track) : Promise.resolve(demoPools(track));
+  ready.then((pools) => {
+    if (seq !== choiceSeq || state.revealed || state.track !== track) return;
+    buildChoices(pools, track);
+  }).catch(() => { if (seq === choiceSeq) choicesFallback(); });
+}
+
+function choicesFallback() {
+  state.choicesFailed = true;
+  applyInputUI();
+  setStatus("not enough to pick from — type it");
+  if (els.app.ownerDocument.hasFocus()) els.artist.focus();
+}
+
+function demoPools(track) {
+  const others = DEMO_TRACKS.filter((t) => t.song !== track.song || t.artist !== track.artists[0]);
+  return { artists: others.map((t) => t.artist), songs: others.map((t) => t.song), years: others.map((t) => t.year) };
+}
+
+async function fetchSpotifyPools(track) {
+  const pools = { artists: [], songs: [], years: [] };
+  const jobs = [];
+  if (track.albumId) jobs.push((async () => {
+    let items = albumCache.get(track.albumId);
+    if (items === undefined) {
+      try {
+        const res = await api(`https://api.spotify.com/v1/albums/${track.albumId}/tracks?limit=50`);
+        items = res.ok ? (await res.json()).items : null;
+      } catch { items = null; }
+      albumCache.set(track.albumId, items);
+    }
+    if (items) for (const it of items) {
+      pools.songs.push(it.name);
+      for (const a of it.artists || []) pools.artists.push(a.name);
+    }
+  })());
+  jobs.push((async () => {
+    try {
+      const res = await api("https://api.spotify.com/v1/me/player/queue");
+      if (res.ok) {
+        const data = await res.json();
+        for (const item of data.queue || []) {
+          if (!item || !item.name) continue;
+          pools.songs.push(item.name);
+          for (const a of item.artists || []) pools.artists.push(a.name);
+          if (item.album && item.album.release_date) {
+            const y = parseInt(item.album.release_date.slice(0, 4), 10);
+            if (y) pools.years.push(y);
+          }
+        }
+      }
+    } catch {}
+  })());
+  await Promise.all(jobs);
+  return pools;
+}
+
+function shuffled(arr) {
+  const r = arr.slice();
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+
+// accepted = answers that count as correct (first is the one shown as the right button)
+function buildOptions(accepted, pool) {
+  const seen = new Set(accepted.map((a) => normalize(String(a))));
+  const opts = [String(accepted[0])];
+  for (const cand of shuffled(pool)) {
+    const s = String(cand);
+    const n = normalize(s);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    opts.push(s);
+    if (opts.length >= 5) break;
+  }
+  return shuffled(opts);
+}
+
+function yearPool(answer, years) {
+  const now = new Date().getFullYear();
+  const out = years.filter((y) => y && y !== answer);
+  for (const off of [1, -1, 2, -2, 3, -3, 5, -5, 7, -7, 10, -10, 14, -14]) {
+    const y = answer + off;
+    if (y >= 1950 && y <= now + 1) out.push(y);
+  }
+  return out;
+}
+
+function buildChoices(pools, track) {
+  const accepted = [track.artists, [track.song], [String(track.third.answer)]];
+  const opts = [
+    buildOptions(track.artists, pools.artists),
+    buildOptions([track.song], pools.songs),
+    buildOptions(accepted[2], yearPool(track.third.answer, pools.years)),
+  ];
+  if (opts[0].length < 2 || opts[1].length < 2 || opts[2].length < 2) { choicesFallback(); return; }
+  state.choice.accepted = accepted;
+  state.choice.opts = opts;
+  renderStage();
+}
+
+function renderStage() {
+  const c = state.choice;
+  if (!c.opts) return;
+  els.choiceLabel.textContent = (c.stage + 1) + "/3 · " + ["artist", "song", "year"][c.stage];
+  els.choiceList.replaceChildren();
+  for (const opt of c.opts[c.stage]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = opt;
+    b.onclick = () => pickOption(opt, b);
+    els.choiceList.appendChild(b);
+  }
+  if (els.app.ownerDocument.hasFocus()) els.choiceList.firstChild.focus();
+}
+
+function pickOption(opt, btn) {
+  const c = state.choice;
+  if (!c.opts || state.revealed || c.results.length !== c.stage) return;
+  const ok = c.accepted[c.stage].includes(opt);
+  c.results.push(ok);
+  btn.classList.add(ok ? "pick-ok" : "pick-bad");
+  const answer = c.accepted[c.stage][0];
+  for (const b of els.choiceList.children) {
+    b.disabled = true;
+    if (!ok && b.textContent === answer) b.classList.add("pick-right");
+  }
+  c.stage += 1;
+  const wait = reduceMotion.matches ? 250 : ok ? 650 : 1500;
+  setTimeout(() => {
+    if (state.choice !== c || state.revealed) return;
+    if (c.stage < 3) renderStage();
+    else finishPick();
+  }, wait);
+}
+
+function finishPick() {
+  const right = state.choice.results.filter(Boolean).length;
+  state.rounds += 1;
+  if (right === 3) {
+    state.points += 4;
+    state.streak = state.streak + 1;
+    finish(state.streak >= 3 ? `far out! ${state.streak} in a row` : "groovy! nailed it", true);
+    popPoints(4);
+    burst();
+  } else {
+    state.streak = 0;
+    finish(`${right}/3 right — next one's yours`);
+  }
+  els.choiceLabel.textContent = "next track inbound…";
+}
+
 function startDemo() {
-  stopSoloist(); stopSpotify();
+  stopSpotify();
   setMode("demo");
+  applyInputUI();
   setConn("demo", "demo · " + Math.round(CONFIG.demoTrackMs / 1000) + "s per track");
   console.log("[gtt] demo mode started");
   nextDemoTrack();
@@ -557,78 +761,8 @@ function stopDemo() {
   state.demoStart = 0;
 }
 
-let soloWs = null;
-
-function stopSoloist() {
-  if (soloWs) {
-    const ws = soloWs; soloWs = null;
-    ws.onclose = null;
-    try { ws.close(); } catch {}
-  }
-}
-
 function stopSpotify() {
   if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
-}
-
-function startSoloist() {
-  if (location.protocol === "https:") { setStatus("soloist mode only works from the local version"); return; }
-  stopDemo(); stopSpotify();
-  setMode("soloist");
-  state.pos = null; state.trackDuration = 0;
-  setPlaying(false);
-  console.log("[gtt] soloist mode started");
-  connectSoloist();
-}
-
-function connectSoloist() {
-  try { if (soloWs) { const ws = soloWs; soloWs = null; ws.onclose = null; ws.close(); } } catch {}
-  setConn("wait", "soloist: connecting…");
-  try { soloWs = new WebSocket(CONFIG.soloistWs); } catch { soloRetry(); return; }
-  soloWs.onmessage = (e) => {
-    let m; try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "auth_state") {
-      if (m.logged_in) setConn(m.is_active ? "on" : "demo", "soloist: " + (m.device_name || "paired") + (m.is_active ? " · active" : " · idle"));
-      else setConn("wait", "soloist: pick device in Spotify app");
-    }
-    if (m.type === "device_changed") {
-      setConn(m.is_active ? "on" : "demo", "soloist: " + (m.device_name || "paired") + (m.is_active ? " · active" : " · idle"));
-    }
-    if (m.type === "playback_state" || m.type === "track_changed") applySoloist(m);
-    if (m.type === "position_sync") state.pos = m.position;
-  };
-  soloWs.onclose = soloRetry;
-  soloWs.onerror = () => {};
-}
-
-function soloRetry() {
-  if (state.mode !== "soloist") return;
-  setConn("off", "soloist: offline — retrying");
-  setPlaying(false);
-  setTimeout(() => { if (state.mode === "soloist") connectSoloist(); }, 3000);
-}
-
-function applySoloist(m) {
-  if (m.status) setPlaying(m.status !== "paused" && m.status !== "idle");
-  const item = m.item;
-  if (!item || !item.uri || (item.entity_type !== "track" && item.entity_type !== "episode")) {
-    if (m.status === "idle" || m.status === "paused") setStatus(m.status === "paused" ? "paused — hit play" : "idle");
-    return;
-  }
-  const d = item.decorations || {};
-  const artists = (d.creators || [])
-    .map((c) => c.entity && c.entity.decorations && c.entity.decorations.identity && c.entity.decorations.identity.name)
-    .filter(Boolean);
-  const song = (d.identity && d.identity.name) || "";
-  const album = d.parent && d.parent.entity && d.parent.entity.decorations && d.parent.entity.decorations.identity
-    ? d.parent.entity.decorations.identity.name : "";
-  const covers = (d.visual_identity && d.visual_identity.cover) || [];
-  const art = (covers.find((c) => c.size === "large") || covers[0] || {}).url || null;
-  state.trackDuration = (d.playback && d.playback.duration_ms) || 0;
-  state.pos = m.position || state.pos;
-  const track = { artists: artists.length ? artists : [""], song, third: { label: "album", answer: album }, artUrl: art };
-  if (item.uri !== state.trackKey) newRound(track, item.uri);
-  else state.track = track;
 }
 
 function nextDemoTrack() {
@@ -641,13 +775,13 @@ function nextDemoTrack() {
   newRound({ artists: [t.artist], song: t.song, third: { label: "year", answer: t.year }, artUrl: null }, "demo:" + t.song + Math.random());
 }
 
-// one ticker drives the bar for every mode; spotify/soloist interpolate from last known position
+// one ticker drives the bar for every mode; spotify interpolates from last known position
 setInterval(() => {
   if (state.mode === "demo" && state.demoStart) {
     const elapsed = Date.now() - state.demoStart;
     setProgress(elapsed, CONFIG.demoTrackMs);
     if (elapsed >= CONFIG.demoTrackMs) nextDemoTrack();
-  } else if ((state.mode === "spotify" || state.mode === "soloist") && state.pos && state.trackDuration) {
+  } else if (state.mode === "spotify" && state.pos && state.trackDuration) {
     const elapsed = state.pos.position_ms + (Date.now() - state.pos.timestamp_ms) * (state.pos.speed || 0);
     setProgress(elapsed, state.trackDuration);
   }
@@ -675,6 +809,7 @@ async function pollSpotify() {
       song: item.name,
       third: { label: "year", answer: parseInt((item.album.release_date || "0").slice(0, 4), 10) },
       artUrl: (item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
+      albumId: item.album ? item.album.id : null,
     };
     const key = item.id;
     if (key !== state.trackKey) newRound(track, key);
@@ -706,8 +841,9 @@ async function startSpotify() {
     await redirectToSpotify();
     return;
   }
-  stopDemo(); stopSoloist();
+  stopDemo();
   setMode("spotify");
+  applyInputUI();
   state.pos = null; state.trackDuration = 0;
   setConn("wait", "connecting…");
   try {
@@ -797,18 +933,18 @@ async function refreshAccessToken() {
   } catch { return false; }
 }
 
-const START = { spotify: startSpotify, soloist: startSoloist, demo: startDemo };
+const START = { spotify: startSpotify, demo: startDemo };
 els.segs.forEach((b) => {
   b.onclick = () => { if (b.dataset.mode !== state.mode) START[b.dataset.mode](); };
+});
+els.imodes.forEach((b) => {
+  b.onclick = () => setImode(b.dataset.imode);
 });
 els.check.onclick = check;
 els.reveal.onclick = reveal;
 els.skip.onclick = () => {
   if (state.mode === "demo") { nextDemoTrack(); return; }
   if (!state.revealed && state.track) { state.rounds += 1; state.streak = 0; finish("skipped"); }
-  if (state.mode === "soloist" && soloWs && soloWs.readyState === 1) {
-    try { soloWs.send(JSON.stringify({ type: "command", command: "skip_next" })); } catch {}
-  }
 };
 [els.artist, els.song, els.year].forEach((input, i, all) => {
   input.addEventListener("keydown", (e) => {
