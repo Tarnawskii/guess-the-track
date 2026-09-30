@@ -6,115 +6,143 @@
 <title>Guess The Track</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+    --label: #f5f5f7;
+    --label2: #98989f;
+    --label3: #636366;
+    --fill: rgba(120, 120, 128, 0.24);
+    --fill2: rgba(120, 120, 128, 0.38);
+    --hairline: rgba(255, 255, 255, 0.09);
+    --glass: rgba(30, 30, 32, 0.72);
+    --accent: #1ed760;
+    --ok: #30d158;
+    --warn: #ffd60a;
+    --bad: #ff453a;
+  }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
-    background: #0c0d10;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #000;
     background-image:
-      radial-gradient(60rem 30rem at 15% -10%, rgba(64, 96, 255, 0.18), transparent 60%),
-      radial-gradient(50rem 28rem at 110% 110%, rgba(30, 215, 96, 0.10), transparent 60%),
-      radial-gradient(40rem 24rem at 90% -20%, rgba(170, 82, 255, 0.10), transparent 60%);
+      radial-gradient(60rem 32rem at 12% -12%, rgba(64, 96, 255, 0.16), transparent 60%),
+      radial-gradient(52rem 30rem at 112% 112%, rgba(30, 215, 96, 0.10), transparent 60%),
+      radial-gradient(40rem 26rem at 88% -18%, rgba(170, 82, 255, 0.09), transparent 60%);
     background-attachment: fixed;
-    color: #eef0f4;
+    color: var(--label);
     display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; padding: 12px;
+    min-height: 100vh; padding: 0.75rem;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   #app {
-    width: 100%; max-width: 340px;
-    background: rgba(255, 255, 255, 0.055);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-top-color: rgba(255, 255, 255, 0.18);
-    border-radius: 22px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    padding: 18px; display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 21.25rem;
+    background: var(--glass);
+    backdrop-filter: blur(2.5rem) saturate(1.8);
+    -webkit-backdrop-filter: blur(2.5rem) saturate(1.8);
+    border: 1px solid var(--hairline);
+    border-radius: 1.75rem;
+    box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.6);
+    padding: 1.25rem; display: flex; flex-direction: column; gap: 0.625rem;
   }
   header { display: flex; justify-content: space-between; align-items: center; }
-  h1 {
-    font-size: 12px; font-weight: 700; letter-spacing: 3px;
-    background: linear-gradient(90deg, #eef0f4, #9aa3b5);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .hbtns { display: flex; gap: 6px; }
+  h1 { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; color: var(--label2); }
+  .hbtns { display: flex; gap: 0.375rem; }
   button {
-    font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
-    background: rgba(255, 255, 255, 0.08);
-    color: #eef0f4; border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 10px; padding: 6px 10px;
-    transition: background 0.15s, transform 0.05s;
+    font: inherit; font-size: 0.6875rem; font-weight: 600; cursor: pointer;
+    min-height: 2.25rem; padding: 0 0.75rem;
+    background: var(--fill); color: var(--label);
+    border: 0; border-radius: 0.625rem;
+    transition: background-color 120ms var(--ease), transform 100ms var(--ease);
   }
-  button:hover { background: rgba(255, 255, 255, 0.14); }
-  button:active { transform: scale(0.97); }
+  @media (hover: hover) and (pointer: fine) {
+    button:hover { background: var(--fill2); }
+  }
+  button:active { transform: scale(0.96); }
   button:disabled { opacity: 0.4; cursor: default; }
-  #cover {
-    height: 120px; display: flex; align-items: center; justify-content: center;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px; overflow: hidden;
-    font-size: 44px; font-weight: 800;
-    background-image: linear-gradient(135deg, rgba(64, 96, 255, 0.25), rgba(30, 215, 96, 0.15));
-    color: rgba(255, 255, 255, 0.75);
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+  #conn { display: flex; align-items: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; color: var(--label2); }
+  .led { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--label3); flex: none; transition: background-color 200ms var(--ease); }
+  .led.on { background: var(--ok); box-shadow: 0 0 0.5rem rgba(48, 209, 88, 0.7); animation: pulse 2.4s infinite; }
+  .led.demo { background: var(--warn); box-shadow: 0 0 0.5rem rgba(255, 214, 10, 0.5); animation: pulse 2.4s infinite; }
+  .led.wait { background: var(--warn); animation: pulse 0.9s infinite; }
+  .led.off { background: var(--bad); box-shadow: 0 0 0.5rem rgba(255, 69, 58, 0.6); }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  #cover { height: 8.5rem; perspective: 62.5rem; position: relative; flex: none; }
+  .cover-inner {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 280ms var(--ease-out);
   }
-  #cover img { width: 100%; height: 100%; object-fit: cover; }
-  .bar {
-    height: 5px; border-radius: 3px; overflow: hidden;
-    background: rgba(255, 255, 255, 0.08);
+  #cover.flipped .cover-inner { transform: rotateY(180deg); }
+  .cover-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 1.25rem; overflow: hidden;
+    border: 1px solid var(--hairline);
   }
+  .cover-front {
+    background: linear-gradient(135deg, #2c2c31, #1c1c20);
+    font-size: 2.75rem; font-weight: 800; color: var(--label3);
+  }
+  .cover-back { transform: rotateY(180deg); background: #1c1c20; }
+  .cover-back img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .bar { height: 0.3125rem; border-radius: 999px; overflow: hidden; background: var(--fill); }
   .bar div {
-    height: 100%; width: 0%; border-radius: 3px;
-    background: linear-gradient(90deg, #1ed760, #5ce08a);
-    transition: width 1s linear;
+    height: 100%; border-radius: 999px;
+    background: var(--accent);
+    transform-origin: 0 50%; transform: scaleX(0);
+    will-change: transform;
   }
   input {
-    font: inherit; font-size: 13px; width: 100%;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    color: #eef0f4; border-radius: 10px; padding: 9px 12px;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    font: inherit; font-size: 1rem; width: 100%;
+    min-height: 2.75rem;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid var(--hairline);
+    color: var(--label); border-radius: 0.75rem; padding: 0 0.875rem;
+    transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
   }
-  input::placeholder { color: #6f7683; }
-  input:focus {
-    outline: none;
-    border-color: rgba(30, 215, 96, 0.55);
-    box-shadow: 0 0 0 3px rgba(30, 215, 96, 0.15);
-  }
-  .chips { display: flex; gap: 5px; }
+  input::placeholder { color: var(--label3); }
+  input:focus { outline: none; border-color: rgba(30, 215, 96, 0.5); box-shadow: 0 0 0 3px rgba(30, 215, 96, 0.12); }
+  .chips { display: flex; gap: 0.375rem; }
   .chip {
-    flex: 1; text-align: center; font-size: 10px; font-weight: 600;
-    padding: 5px 0; border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05); color: #6f7683;
+    flex: 1; text-align: center; font-size: 0.6875rem; font-weight: 600;
+    padding: 0.4375rem 0; border-radius: 0.625rem;
+    background: var(--fill); color: var(--label3);
     border: 1px solid transparent;
-    transition: all 0.2s;
+    transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
   }
-  .chip.ok { background: rgba(30, 215, 96, 0.16); color: #5ce08a; border-color: rgba(30, 215, 96, 0.35); }
-  .chip.close { background: rgba(255, 200, 60, 0.14); color: #ffd97a; border-color: rgba(255, 200, 60, 0.3); }
-  .chip.bad { background: rgba(255, 80, 110, 0.14); color: #ff8aa5; border-color: rgba(255, 80, 110, 0.3); }
-  .actions { display: flex; gap: 6px; }
-  .actions button { flex: 1; padding: 9px 0; font-size: 11px; }
+  .chip.ok { background: rgba(48, 209, 88, 0.18); color: var(--ok); border-color: rgba(48, 209, 88, 0.4); }
+  .chip.close { background: rgba(255, 214, 10, 0.15); color: var(--warn); border-color: rgba(255, 214, 10, 0.35); }
+  .chip.bad { background: rgba(255, 69, 58, 0.16); color: var(--bad); border-color: rgba(255, 69, 58, 0.4); }
+  .actions { display: flex; gap: 0.5rem; }
+  .actions button { flex: 1; min-height: 2.75rem; font-size: 0.75rem; }
   #check {
-    background: #1ed760; color: #06130a; border: none; font-weight: 700;
-    box-shadow: 0 4px 16px rgba(30, 215, 96, 0.35);
+    background: var(--accent); color: #04140a; font-weight: 700;
+    box-shadow: 0 0.25rem 1rem rgba(30, 215, 96, 0.3);
   }
-  #check:hover { background: #25e56b; }
-  #status { font-size: 11px; color: #8b93a1; min-height: 14px; text-align: center; }
-  #score { font-size: 11px; font-weight: 600; color: #b6bcc8; text-align: center; letter-spacing: 0.5px; }
+  @media (hover: hover) and (pointer: fine) {
+    #check:hover { background: #25e56b; }
+  }
+  #check:active { transform: scale(0.96); }
+  #status { font-size: 0.8125rem; color: var(--label2); min-height: 1.125rem; text-align: center; }
+  #score { font-size: 0.8125rem; font-weight: 600; color: var(--label2); text-align: center; font-variant-numeric: tabular-nums; }
   #answer {
-    font-size: 13px; text-align: center; color: #eef0f4; display: none;
-    padding: 8px; border-radius: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.875rem; text-align: center; color: var(--label); display: none;
+    padding: 0.625rem 0.75rem; border-radius: 0.75rem;
+    background: var(--fill);
+    border: 1px solid var(--hairline);
   }
-  footer { font-size: 9px; color: #5a6070; text-align: center; letter-spacing: 1px; }
-  #conn { display: flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 600; letter-spacing: 1px; color: #8b93a1; }
-  .led { width: 8px; height: 8px; border-radius: 50%; background: #5a6070; flex: none; transition: background 0.3s; }
-  .led.on { background: #1ed760; box-shadow: 0 0 8px rgba(30, 215, 96, 0.8); animation: pulse 2s infinite; }
-  .led.demo { background: #ffd97a; box-shadow: 0 0 8px rgba(255, 217, 122, 0.6); animation: pulse 2s infinite; }
-  .led.wait { background: #ffd97a; animation: pulse 0.8s infinite; }
-  .led.off { background: #ff506e; box-shadow: 0 0 8px rgba(255, 80, 110, 0.7); }
-  @keyframes pulse { 50% { opacity: 0.3; } }
+  #answer.pop { animation: answer-in 200ms var(--ease-out); }
+  @keyframes answer-in { from { opacity: 0; transform: scale(0.97); } }
+  footer { font-size: 0.6875rem; color: var(--label3); text-align: center; letter-spacing: 0.06em; }
+  @media (prefers-reduced-motion: reduce) {
+    .cover-inner { transition: none; }
+    #answer.pop { animation: none; }
+    .led { animation: none; }
+    button:active { transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -127,7 +155,12 @@
     </div>
   </header>
   <div id="conn"><span id="led" class="led"></span><span id="connText">offline</span></div>
-  <div id="cover">?</div>
+  <div id="cover">
+    <div class="cover-inner">
+      <div class="cover-face cover-front">?</div>
+      <div class="cover-face cover-back" id="coverBack"></div>
+    </div>
+  </div>
   <div class="bar"><div id="progress"></div></div>
   <input id="gArtist" placeholder="artist" autocomplete="off" />
   <input id="gSong" placeholder="song" autocomplete="off" />
@@ -186,6 +219,7 @@ const els = {
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
   pipBtn: $("pipBtn"), modeBtn: $("modeBtn"),
   led: $("led"), connText: $("connText"),
+  coverBack: $("coverBack"),
 };
 
 function setConn(cls, text) {
@@ -242,13 +276,19 @@ function setChip(chip, verdict) {
   if (verdict) chip.classList.add(verdict);
 }
 
+function setProgress(p) {
+  els.progress.style.transform = "scaleX(" + Math.min(1, Math.max(0, p)).toFixed(4) + ")";
+}
+
 function newRound(track, key) {
   state.track = track; state.trackKey = key; state.revealed = false;
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   els.answer.style.display = "none"; els.answer.textContent = "";
+  els.answer.classList.remove("pop");
   [els.cArtist, els.cSong, els.cYear].forEach((c) => setChip(c, null));
-  els.cover.textContent = "?";
+  els.cover.classList.remove("flipped");
   els.status.textContent = "new track — guess!";
+  if (document.hasFocus()) els.artist.focus();
   if (track.third.label === "album") {
     els.year.placeholder = "album"; els.year.removeAttribute("maxlength"); els.year.removeAttribute("inputmode");
   } else {
@@ -304,12 +344,13 @@ function finish(msg) {
   els.score.textContent = `rounds ${state.rounds} · points ${state.points} · streak ${state.streak}`;
   els.answer.textContent = answerText();
   els.answer.style.display = "block";
+  els.answer.classList.add("pop");
   if (state.track.artUrl) {
-    els.cover.textContent = "";
     const img = document.createElement("img");
     img.src = state.track.artUrl;
-    els.cover.textContent = "";
-    els.cover.appendChild(img);
+    img.alt = "";
+    els.coverBack.replaceChildren(img);
+    els.cover.classList.add("flipped");
   }
 }
 
@@ -413,7 +454,7 @@ function tickSoloistProgress() {
   if (state.mode !== "soloist" || !state.pos || !state.trackDuration) return;
   const elapsed = state.pos.position_ms + (Date.now() - state.pos.timestamp_ms) * (state.pos.speed || 0);
   const p = Math.min(1, Math.max(0, elapsed / state.trackDuration));
-  els.progress.style.width = (p * 100).toFixed(1) + "%";
+  setProgress(p);
 }
 
 function nextDemoTrack() {
@@ -426,7 +467,7 @@ function nextDemoTrack() {
 function tickDemoProgress() {
   if (state.mode !== "demo") return;
   const p = Math.min(1, (Date.now() - state.demoStart) / state.demoDuration);
-  els.progress.style.width = (p * 100).toFixed(1) + "%";
+  setProgress(p);
   if (p >= 1) nextDemoTrack();
 }
 
@@ -457,7 +498,7 @@ async function pollSpotify() {
     if (key !== state.trackKey) newRound(track, key);
     if (item.duration_ms) {
       const p = Math.min(1, (data.progress_ms || 0) / item.duration_ms);
-      els.progress.style.width = (p * 100).toFixed(1) + "%";
+      setProgress(p);
     }
   } catch (e) {
     els.status.textContent = "connection glitch — retrying";
@@ -589,8 +630,8 @@ els.skip.onclick = () => {
   }
 };
 els.year.addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
-els.song.addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
-els.artist.addEventListener("keydown", (e) => { if (e.key === "Enter") check(); });
+els.song.addEventListener("keydown", (e) => { if (e.key === "Enter") els.year.focus(); });
+els.artist.addEventListener("keydown", (e) => { if (e.key === "Enter") els.song.focus(); });
 
 async function togglePip() {
   if (!("documentPictureInPicture" in window)) {
