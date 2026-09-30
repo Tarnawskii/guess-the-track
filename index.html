@@ -477,7 +477,7 @@ async function startSpotify() {
   if (code) {
     history.replaceState(null, "", location.pathname);
     console.log("[gtt] exchanging code for token…");
-    await exchangeCode(code);
+    if (!await exchangeCode(code)) return;
   } else if (!loadToken()) {
     console.log("[gtt] no token, redirecting to spotify login");
     await redirectToSpotify();
@@ -518,7 +518,7 @@ async function saveAuth(auth) {
 }
 
 async function redirectToSpotify() {
-  const verifier = btoa(crypto.getRandomValues(new Uint8Array(48)).toString("latin1"))
+  const verifier = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(64))))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
@@ -547,12 +547,11 @@ async function exchangeCode(code) {
       code_verifier: sessionStorage.getItem("pip_widget_verifier") || "",
     }),
   });
-  if (res.ok) await saveAuth(await res.json());
-  else {
-    const body = await res.text();
-    console.error("[gtt] token exchange failed:", res.status, body);
-    els.status.textContent = "auth failed (" + res.status + ") — check console";
-  }
+  if (res.ok) { await saveAuth(await res.json()); return true; }
+  const body = await res.text();
+  console.error("[gtt] token exchange failed:", res.status, body);
+  els.status.textContent = "auth failed (" + res.status + ") — click SPOTIFY to retry";
+  return false;
 }
 
 async function refreshAccessToken() {
