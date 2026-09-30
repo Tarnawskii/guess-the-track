@@ -122,7 +122,7 @@
   <header>
     <h1>GUESS THE TRACK</h1>
     <div class="hbtns">
-      <button id="modeBtn" title="Cycle demo / soloist / spotify">SOLOIST</button>
+      <button id="modeBtn" title="Cycle spotify / soloist / demo">SPOTIFY</button>
       <button id="pipBtn" title="Pop out as always-on-top widget">⧉ PiP</button>
     </div>
   </header>
@@ -142,7 +142,7 @@
     <button id="reveal">REVEAL</button>
     <button id="skip">SKIP</button>
   </div>
-  <div id="status">click SOLOIST to start</div>
+  <div id="status">click SPOTIFY to connect</div>
   <div id="score">rounds 0 · points 0 · streak 0</div>
   <div id="answer"></div>
   <footer>don't look at Spotify</footer>
@@ -169,6 +169,16 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+window.addEventListener("error", (e) => {
+  console.error("[gtt] JS error:", e.message, "at", e.filename + ":" + e.lineno);
+  const s = $("status"); if (s) s.textContent = "error: " + e.message;
+});
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[gtt] unhandled promise:", e.reason);
+  const s = $("status"); if (s) s.textContent = "error: " + (e.reason && e.reason.message ? e.reason.message : e.reason);
+});
+console.log("[gtt] script loaded, protocol:", location.protocol, "client id set:", !!document.getElementById("app") && true);
 const els = {
   cover: $("cover"), progress: $("progress"), status: $("status"), score: $("score"),
   answer: $("answer"), artist: $("gArtist"), song: $("gSong"), year: $("gYear"),
@@ -313,7 +323,8 @@ async function startDemo() {
   stopSoloist(); stopSpotify();
   state.mode = "demo";
   setConn("demo", "demo mode");
-  els.modeBtn.textContent = "SOLOIST";
+  els.modeBtn.textContent = "SPOTIFY";
+  console.log("[gtt] demo mode started");
   nextDemoTrack();
   state.demoTimer = setInterval(nextDemoTrack, CONFIG.demoTrackMs);
   state.demoTick = setInterval(tickDemoProgress, 1000);
@@ -341,9 +352,11 @@ function stopSpotify() {
 }
 
 function startSoloist() {
+  if (location.protocol === "https:") { els.status.textContent = "soloist mode only works from the local version"; return; }
   stopDemo(); stopSpotify();
   state.mode = "soloist";
-  els.modeBtn.textContent = "SPOTIFY";
+  els.modeBtn.textContent = "DEMO";
+  console.log("[gtt] soloist mode started");
   state.soloTick = setInterval(tickSoloistProgress, 1000);
   connectSoloist();
 }
@@ -431,7 +444,8 @@ async function pollSpotify() {
     if (!res.ok) { setConn("off", "error " + res.status); return; }
     state.lastPoll = Date.now();
     const data = await res.json();
-    if (!data || !data.item) return;
+    if (!data || !data.item) { console.log("[gtt] poll ok, no item"); return; }
+    console.log("[gtt] poll ok, item:", data.item.id, "playing:", !!data.is_playing);
     const item = data.item;
     const track = {
       artists: item.artists.map((a) => a.name),
@@ -454,25 +468,29 @@ async function pollSpotify() {
 async function startSpotify() {
   if (!CONFIG.spotifyClientId) {
     els.status.textContent = "set spotifyClientId in CONFIG (top of file)";
+    console.error("[gtt] no client id configured");
     return;
   }
   const url = new URL(location.href);
   const code = url.searchParams.get("code");
+  console.log("[gtt] startSpotify: code on url:", !!code, "storage url:", localStorage.getItem("pip_widget_auth") ? "token cached" : "no token");
   if (code) {
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", location.pathname);
+    console.log("[gtt] exchanging code for token…");
     await exchangeCode(code);
   } else if (!loadToken()) {
+    console.log("[gtt] no token, redirecting to spotify login");
     await redirectToSpotify();
     return;
   }
   state.mode = "spotify";
   stopDemo(); stopSoloist();
-  setConn("wait", "connecting…");
-  try {
+  setConn("wait", "connecting…");  try {
     const me = await api("https://api.spotify.com/v1/me");
     if (me.ok) { const u = await me.json(); state.userName = u.display_name || u.id; }
   } catch {}
-  els.modeBtn.textContent = "DEMO";
+  els.modeBtn.textContent = location.protocol === "http:" ? "SOLOIST" : "DEMO";
+  console.log("[gtt] spotify mode starting");
   stopDemo();
   pollSpotify();
   state.pollTimer = setInterval(pollSpotify, CONFIG.pollMs);
@@ -530,7 +548,11 @@ async function exchangeCode(code) {
     }),
   });
   if (res.ok) await saveAuth(await res.json());
-  else els.status.textContent = "auth failed — check client id / redirect uri";
+  else {
+    const body = await res.text();
+    console.error("[gtt] token exchange failed:", res.status, body);
+    els.status.textContent = "auth failed (" + res.status + ") — check console";
+  }
 }
 
 async function refreshAccessToken() {
@@ -554,9 +576,9 @@ async function refreshAccessToken() {
 }
 
 els.modeBtn.onclick = () => {
-  if (state.mode === "demo") startSoloist();
-  else if (state.mode === "soloist") { location.search = ""; startSpotify(); }
-  else { location.search = ""; startDemo(); }
+  if (state.mode === "idle" || state.mode === "demo") startSpotify();
+  else if (state.mode === "spotify" && location.protocol === "http:") startSoloist();
+  else startDemo();
 };
 els.check.onclick = check;
 els.reveal.onclick = reveal;
