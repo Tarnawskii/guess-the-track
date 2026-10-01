@@ -106,6 +106,10 @@
     color: var(--ink); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.35);
   }
   #conn { display: flex; align-items: center; justify-content: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2); min-height: 1rem; }
+  #reconnect {
+    min-height: 2rem; margin: -0.5rem 0 -0.5rem 0.25rem; padding: 0 0.625rem; border-radius: 999px;
+    font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--mustard); background: transparent;
+  }
   .led { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--label3); flex: none; transition: background-color 200ms var(--ease); }
   .led.on { background: var(--ok); box-shadow: 0 0 0.5rem rgba(168, 224, 99, 0.7); animation: pulse 2.4s infinite; }
   .led.wait { background: var(--mustard); animation: pulse 0.9s infinite; }
@@ -300,7 +304,7 @@
     <button data-imode="type" aria-pressed="true">Type</button>
     <button data-imode="pick" aria-pressed="false">Pick 5</button>
   </div>
-  <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span></div>
+  <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
   <div class="stage" id="stage">
     <div class="deck">
       <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label"></div></div></div>
@@ -394,7 +398,7 @@ const els = {
   stP: [$("stP0"), $("stP1")], sP: [$("sP0"), $("sP1")], pName: [$("pName0"), $("pName1")], sWins: $("sWins"),
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
-  led: $("led"), connText: $("connText"),
+  led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
 
@@ -925,7 +929,11 @@ async function pollSpotify() {
   try {
     const res = await api("https://api.spotify.com/v1/me/player/currently-playing");
     if (res.status === 204) { setStatus("nothing playing — start a song in Spotify"); setPlaying(false); state.lastPoll = Date.now(); return; }
-    if (!res.ok) { setConn("off", "error " + res.status); return; }
+    if (!res.ok) {
+      setConn("off", "error " + res.status);
+      if (res.status === 401) setStatus("Spotify login expired — hit reconnect");
+      return;
+    }
     state.lastPoll = Date.now();
     const data = await res.json();
     if (!data || !data.item) { console.log("[gtt] poll ok, no item"); return; }
@@ -1036,7 +1044,7 @@ async function exchangeCode(code) {
   if (res.ok) { await saveAuth(await res.json()); return true; }
   const body = await res.text();
   console.error("[gtt] token exchange failed:", res.status, body);
-  setStatus("auth failed (" + res.status + ") — click Spotify to retry");
+  setStatus("auth failed (" + res.status + ") — hit reconnect to retry");
   return false;
 }
 
@@ -1111,6 +1119,23 @@ async function togglePip() {
   });
 }
 els.pipBtn.onclick = togglePip;
+
+// full re-login; a page reload wipes the scoreboard, so ask twice if there's anything to lose
+let reconnectArmedAt = 0;
+els.reconnect.onclick = async () => {
+  const stakes = state.rounds > 0 || vs.players.some((p) => p.points || p.wins);
+  if (stakes && Date.now() - reconnectArmedAt > 4000) {
+    reconnectArmedAt = Date.now();
+    setStatus("tap reconnect again — scores will reset");
+    return;
+  }
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  try { localStorage.removeItem("pip_widget_auth"); } catch {}
+  setConn("wait", "reconnecting…");
+  setStatus("heading to Spotify login…");
+  if ("documentPictureInPicture" in window && documentPictureInPicture.window) documentPictureInPicture.window.close();
+  await redirectToSpotify();
+};
 els.vsBtn.onclick = () => setVersus(!vs.on);
 try {
   const names = JSON.parse(localStorage.getItem("gtt_players") || "[]");
