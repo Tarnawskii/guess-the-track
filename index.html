@@ -89,7 +89,9 @@
   button:disabled { opacity: 0.4; cursor: default; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--mustard); outline-offset: 2px; }
   .hbtns { display: flex; gap: 0.375rem; }
-  #pipBtn, #vsBtn { width: 2.75rem; padding: 0; font-size: 1.125rem; border-radius: 50%; }
+  #pipBtn, #vsBtn, #lyrBtn { width: 2.75rem; padding: 0; font-size: 1.125rem; border-radius: 50%; }
+  #lyrBtn { font-size: 1rem; color: var(--label2); }
+  #lyrBtn[aria-pressed="true"] { background: var(--fill2); color: var(--mustard); box-shadow: inset 0 0 0 1.5px var(--mustard); }
   #vsBtn { font-family: var(--groovy); font-weight: 400; font-size: 0.875rem; color: var(--label2); }
   #vsBtn[aria-pressed="true"] {
     background: linear-gradient(135deg, var(--mustard), var(--orange));
@@ -308,6 +310,21 @@
     background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline);
   }
   #vsResult.pop { animation: answer-in 280ms var(--ease-back); }
+  .plus.minus { color: var(--bad); }
+  #lyrics { display: none; text-align: center; }
+  #lyrics.show { display: block; }
+  #hintBtn { min-height: 2.25rem; width: 100%; border-radius: 999px; color: var(--label2); border: 1px dashed var(--hairline); background: transparent; }
+  .ly-hint { font-size: 0.8125rem; font-style: italic; color: var(--cream); padding: 0.375rem 0.75rem; border-radius: 0.875rem; background: var(--fill); }
+  .ly-note { font-size: 0.6875rem; font-weight: 600; color: var(--label3); }
+  .karaoke { display: grid; gap: 0.125rem; padding: 0.25rem 0; }
+  .karaoke p { min-height: 1.15em; font-size: 0.75rem; font-weight: 600; color: var(--label3); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .karaoke p.now { font-size: 0.9375rem; font-weight: 800; color: var(--cream); white-space: normal; }
+  .karaoke p.now.pop { animation: answer-in 280ms var(--ease-back); }
+  .ly-plain {
+    max-height: 5.5rem; overflow-y: auto; white-space: pre-line; font-size: 0.75rem; font-weight: 600; line-height: 1.45; color: var(--label2); padding: 0.25rem 0.5rem 0.75rem;
+    -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent);
+  }
+  .ly-plain + .ly-note { margin-top: 0.25rem; }
   .vsrow { display: grid; grid-template-columns: 1fr auto 2rem; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--label2); }
   .vsrow span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vsrow b { font-family: var(--groovy); font-weight: 400; text-align: right; }
@@ -322,7 +339,7 @@
   footer { font-size: 0.6875rem; color: var(--label3); text-align: center; letter-spacing: 0.03em; }
   kbd { font: inherit; font-weight: 700; color: var(--label2); padding: 0 0.25rem; border-radius: 0.25rem; background: var(--fill); }
   @media (prefers-reduced-motion: reduce) {
-    .lava i, .disc, .led, .shake, .plus, #answer.pop, #vsResult.pop { animation: none; }
+    .lava i, .disc, .led, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
     .confetti { display: none; }
     .cover-inner, .record, .field .v, .disc-label { transition: none; }
     button:active { transform: none; }
@@ -335,6 +352,7 @@
   <header>
     <h1>Guess the Track</h1>
     <div class="hbtns">
+      <button id="lyrBtn" aria-pressed="false" title="Lyrics (looked up on lrclib.net)" aria-label="Lyrics">🎤</button>
       <button id="vsBtn" aria-pressed="false" title="Two-player versus" aria-label="Two-player versus">VS</button>
       <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
     </div>
@@ -385,6 +403,7 @@
     <button id="skip">Skip</button>
   </div>
   <div id="status" role="status" aria-live="polite">connecting…</div>
+  <div id="lyrics"></div>
   <div id="answer"></div>
   <div id="vsResult" aria-live="polite"></div>
   <footer><span class="solo-only"><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</span><span class="vs-only">one shot each · <kbd>Ctrl ⏎</kbd> lock in · song ends = time's up</span></footer>
@@ -409,6 +428,8 @@ const state = {
   pos: null, trackDuration: 0,
   paid: [false, false, false], // pick mode: stages already paid out this song
   colors: null,                // { key, colors } of the current song's label
+  lyrics: null,                // { key, status, synced, plain } from lrclib.net
+  hint: null,                  // the lyric hint bought for this song
 };
 
 // versus: two players on one device, one round per song
@@ -452,7 +473,7 @@ const els = {
   sPoints: $("sPoints"), sStreak: $("sStreak"), sRounds: $("sRounds"),
   stPoints: $("stPoints"), stStreak: $("stStreak"),
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
-  pipBtn: $("pipBtn"), vsBtn: $("vsBtn"), vsResult: $("vsResult"),
+  pipBtn: $("pipBtn"), vsBtn: $("vsBtn"), vsResult: $("vsResult"), lyrBtn: $("lyrBtn"), lyrics: $("lyrics"),
   stP: [$("stP0"), $("stP1")], sP: [$("sP0"), $("sP1")], pName: [$("pName0"), $("pName1")], sWins: $("sWins"),
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
@@ -547,7 +568,7 @@ function updateScore() {
 function popPoints(n, statEl = els.stPoints) {
   if (reduceMotion.matches) return;
   const el = document.createElement("span");
-  el.className = "plus"; el.textContent = "+" + n;
+  el.className = "plus" + (n < 0 ? " minus" : ""); el.textContent = n < 0 ? "−" + -n : "+" + n;
   el.addEventListener("animationend", () => el.remove());
   statEl.appendChild(el);
 }
@@ -632,6 +653,7 @@ function newRound(track, key, carry = "") {
   const timedOut = !vs.on ? "" : net.role === "guest" ? carry : vsTimeUp();
   state.track = track; state.trackKey = key; state.revealed = false; state.choicesFailed = false;
   state.paid = [false, false, false];
+  state.hint = null;
   applyInputUI();
   setLabelArt(null);
   if (net.role !== "guest") colorLabel(track, key);
@@ -652,6 +674,8 @@ function newRound(track, key, carry = "") {
   } else setTurnHighlight(-1);
   if (net.role === "host") netSend({ t: "round", key, carry: timedOut, players: vs.players });
   setupChoices(track);
+  if (lyricsOn && track.song) loadLyrics(track, key); // early, for the hint
+  renderLyrics();
 }
 
 // answer key: the last 5 songs, newest first, kept across reloads for practice
@@ -739,6 +763,8 @@ function finish(msg, win, note) {
   updateScore();
   addFasit(note);
   renderFasit();
+  if (lyricsOn && (!state.lyrics || state.lyrics.key !== state.trackKey)) loadLyrics(state.track, state.trackKey);
+  renderLyrics();
   els.answer.style.display = "flex";
   els.answer.classList.add("pop");
   fields.forEach((f) => { f.querySelector("input").readOnly = true; });
@@ -1110,7 +1136,7 @@ function vsResolve() {
     const t = state.track;
     net.lastResult = {
       t: "result", key: state.trackKey, w, msg, guesses: vs.guesses, players: vs.players,
-      track: { artists: t.artists, song: t.song, third: t.third, artUrl: t.artUrl },
+      track: { artists: t.artists, song: t.song, third: t.third, artUrl: t.artUrl, album: t.album, duration: t.duration },
     };
     netSend(net.lastResult);
   }
@@ -1164,6 +1190,7 @@ setInterval(() => {
   if (state.pos && state.trackDuration) {
     const elapsed = state.pos.position_ms + (Date.now() - state.pos.timestamp_ms) * (state.pos.speed || 0);
     setProgress(elapsed, state.trackDuration);
+    syncKaraoke(elapsed);
   }
 }, 250);
 
@@ -1193,6 +1220,8 @@ async function pollSpotify() {
       third: { label: "year", answer: parseInt((item.album.release_date || "0").slice(0, 4), 10) },
       artUrl: (item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
       albumId: item.album ? item.album.id : null,
+      album: item.album ? item.album.name : "",
+      duration: item.duration_ms || 0,
     };
     const key = item.id;
     if (key !== state.trackKey) newRound(track, key);
@@ -1440,6 +1469,161 @@ els.pName.forEach((input, i) => {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
 });
 
+// ---------- lyrics (opt-in, from lrclib.net): a hint while guessing, karaoke after the reveal
+let lyricsOn = false;
+try { lyricsOn = localStorage.getItem("gtt_lyrics") === "1"; } catch {}
+const lyricsCache = new Map(); // track key -> Promise<lyrics | null>
+let karaokeIdx = -2;
+
+function setLyricsOn(on) {
+  lyricsOn = on;
+  try { localStorage.setItem("gtt_lyrics", on ? "1" : "0"); } catch {}
+  els.lyrBtn.setAttribute("aria-pressed", String(on));
+  if (on && state.track && state.track.song && (!state.lyrics || state.lyrics.key !== state.trackKey)) loadLyrics(state.track, state.trackKey);
+  renderLyrics();
+  setStatus(on ? "lyrics on — song names get looked up on lrclib.net" : "lyrics off");
+}
+
+// "Song - Remastered 2011" / "Song (feat. X)" -> "Song", for the fuzzy fallback search
+function plainTitle(song) {
+  return song.replace(/\s+-\s+.*$/, "").replace(/\s*[([].*?[)\]]/g, "").trim() || song;
+}
+
+async function fetchLyrics(t) {
+  const artist = t.artists[0] || "";
+  const q = new URLSearchParams({ artist_name: artist, track_name: t.song });
+  if (t.album) q.set("album_name", t.album);
+  if (t.duration) q.set("duration", String(Math.round(t.duration / 1000)));
+  const res = await fetch("https://lrclib.net/api/get?" + q);
+  if (res.ok) return res.json();
+  if (res.status !== 404) throw new Error("lrclib " + res.status);
+  // exact match failed (remaster titles, slightly different durations): search, prefer synced + closest length
+  const sr = await fetch("https://lrclib.net/api/search?" + new URLSearchParams({ artist_name: artist, track_name: plainTitle(t.song) }));
+  if (!sr.ok) return null;
+  const list = (await sr.json()) || [];
+  const off = (r) => (t.duration ? Math.abs(r.duration * 1000 - t.duration) : 0);
+  const ok = list.filter((r) => (r.syncedLyrics || r.plainLyrics || r.instrumental) && off(r) < 8000);
+  ok.sort((a, b) => (!b.syncedLyrics - !a.syncedLyrics) || off(a) - off(b));
+  return ok[0] || null;
+}
+
+function parseLrc(text) {
+  const out = [];
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const stamps = [...raw.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    const words = raw.replace(/\[[^\]]*\]/g, "").trim();
+    for (const m of stamps) out.push({ t: (Number(m[1]) * 60 + Number(m[2])) * 1000, text: words });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+function loadLyrics(track, key) {
+  state.lyrics = { key, status: "loading" };
+  if (!lyricsCache.has(key)) lyricsCache.set(key, fetchLyrics(track).catch((e) => { console.error("[gtt] lyrics:", e); lyricsCache.delete(key); return null; }));
+  lyricsCache.get(key).then((r) => {
+    if (state.trackKey !== key || !state.lyrics || state.lyrics.key !== key) return;
+    const synced = r && r.syncedLyrics ? parseLrc(r.syncedLyrics) : [];
+    const plain = r && r.plainLyrics ? r.plainLyrics.split(/\r?\n/).map((l) => l.trim()) : synced.map((l) => l.text);
+    state.lyrics = {
+      key,
+      status: !r ? "none" : r.instrumental ? "instrumental" : synced.length || plain.some(Boolean) ? "ok" : "none",
+      synced: synced.length ? synced : null,
+      plain,
+    };
+    karaokeIdx = -2;
+    renderLyrics();
+  });
+}
+
+// one early-ish line, title words blanked so the hint isn't the answer
+function lyricHint(lines, song) {
+  const title = normalize(song).split(" ").filter((w) => w.length >= 3);
+  const hasTitle = (l) => normalize(l).split(" ").some((w) => title.includes(w));
+  const usable = [...new Set(lines.filter((l) => l && l.split(/\s+/).length >= 4))];
+  if (!usable.length) return null;
+  const clean = usable.filter((l) => !hasTitle(l));
+  const pool = clean.length ? clean : usable;
+  const early = pool.slice(0, Math.max(1, Math.ceil(pool.length * 0.4)));
+  const line = early[Math.floor(Math.random() * early.length)];
+  return line.split(/(\s+)/).map((tok) => (title.includes(normalize(tok)) ? "___" : tok)).join("");
+}
+
+function useHint() {
+  const ly = state.lyrics;
+  if (state.revealed || vs.on || state.hint || !ly || ly.status !== "ok" || ly.key !== state.trackKey) return;
+  const hint = lyricHint(ly.plain, state.track.song);
+  if (!hint) { state.hint = "no usable line in these lyrics — no charge"; renderLyrics(); return; }
+  state.hint = "“" + hint + "”";
+  state.points -= 1;
+  updateScore();
+  popPoints(-1);
+  renderLyrics();
+}
+
+function lyNote(text) {
+  const n = document.createElement("div");
+  n.className = "ly-note";
+  n.textContent = text;
+  return n;
+}
+
+function renderLyrics() {
+  const ly = state.lyrics && state.lyrics.key === state.trackKey ? state.lyrics : null;
+  let kids = [];
+  if (lyricsOn && state.track && state.track.song) {
+    if (!state.revealed) {
+      // hint: solo only, versus would need a fair way to charge both players
+      if (!vs.on && ly && ly.status === "ok") {
+        if (state.hint) {
+          const h = document.createElement("div");
+          h.className = "ly-hint"; h.textContent = state.hint;
+          kids = [h];
+        } else {
+          const b = document.createElement("button");
+          b.id = "hintBtn"; b.type = "button"; b.textContent = "🎤 lyric hint · −1 point";
+          b.onclick = useHint;
+          kids = [b];
+        }
+      }
+    } else if (!ly || ly.status === "loading") kids = [lyNote("finding lyrics…")];
+    else if (ly.status === "none") kids = [lyNote("no lyrics on LRCLIB for this one")];
+    else if (ly.status === "instrumental") kids = [lyNote("♪ instrumental ♪")];
+    else if (ly.synced) {
+      const k = document.createElement("div");
+      k.className = "karaoke";
+      k.append(...["prev", "now", "next"].map((c) => { const p = document.createElement("p"); p.className = c; return p; }));
+      kids = [k];
+      karaokeIdx = -2;
+    } else {
+      const p = document.createElement("div");
+      p.className = "ly-plain"; p.textContent = ly.plain.join("\n");
+      kids = [p, lyNote("not synced — LRCLIB only has the plain text")];
+    }
+  }
+  els.lyrics.replaceChildren(...kids);
+  els.lyrics.classList.toggle("show", kids.length > 0);
+}
+
+function syncKaraoke(elapsed) {
+  const ly = state.lyrics;
+  if (!state.revealed || !lyricsOn || !ly || !ly.synced || ly.key !== state.trackKey) return;
+  const lines = ly.synced;
+  let i = -1;
+  while (i + 1 < lines.length && lines[i + 1].t <= elapsed + 200) i++; // a hair early reads better
+  if (i === karaokeIdx) return;
+  karaokeIdx = i;
+  const ps = els.lyrics.querySelectorAll(".karaoke p");
+  if (ps.length !== 3) return;
+  const text = (j) => (j < 0 ? "" : j >= lines.length ? "" : lines[j].text || "♪");
+  ps[0].textContent = text(i - 1);
+  ps[1].textContent = i < 0 ? "♪" : text(i);
+  ps[2].textContent = text(i + 1);
+  ps[1].classList.remove("pop"); void ps[1].offsetWidth; ps[1].classList.add("pop");
+}
+
+els.lyrBtn.onclick = () => setLyricsOn(!lyricsOn);
+els.lyrBtn.setAttribute("aria-pressed", String(lyricsOn));
+
 // ---------- online play (PeerJS / WebRTC) ----------
 const PEERJS_URL = "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js";
 let peerLib = null;
@@ -1633,6 +1817,8 @@ function cleanTrack(t) {
     song: str(t.song),
     third: { label: "year", answer: Number(t.third && t.third.answer) || 0 },
     artUrl: art.startsWith("https://") ? art : null,
+    album: str(t.album),
+    duration: Number(t.duration) || 0,
   };
 }
 
