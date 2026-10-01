@@ -190,6 +190,20 @@
   #netText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #net button { min-height: 2rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.6875rem; letter-spacing: 0.04em; }
   #netInvite { background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  #jam { display: none; font-size: 0.6875rem; font-weight: 600; color: var(--label2); text-align: center; }
+  #jam.show { display: block; }
+  #jam [hidden] { display: none; }
+  #jamLink {
+    font: inherit; font-size: 0.75rem; width: 100%; min-height: 2.25rem; padding: 0 0.75rem;
+    color: var(--cream); background: rgba(0, 0, 0, 0.34); border: 1.5px solid var(--hairline); border-radius: 999px;
+  }
+  #jamLink::placeholder { color: var(--label3); }
+  #jamLink.bad { border-color: var(--bad); }
+  #jamLink.ok { border-color: var(--ok); }
+  #jamJoin {
+    display: flex; align-items: center; justify-content: center; min-height: 2.25rem; border-radius: 999px;
+    background: #1db954; color: #08130c; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-decoration: none;
+  }
   #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip { display: none; }
   .plus {
     position: absolute; right: 0.5rem; top: -0.25rem; pointer-events: none;
@@ -314,6 +328,11 @@
   </div>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
   <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="netBtn">Play online</button></div>
+  <div id="jam">
+    <input id="jamLink" type="url" placeholder="Paste your Spotify Jam link so they hear it" aria-label="Spotify Jam link" autocomplete="off" />
+    <a id="jamJoin" target="_blank" rel="noopener noreferrer"></a>
+    <span id="jamHint"></span>
+  </div>
   <div class="stage" id="stage">
     <div class="deck">
       <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label"></div></div></div>
@@ -390,6 +409,7 @@ const net = {
   guestId: null,    // host: device id of the seated guest, so a reload takes the seat back
   myLocked: false,  // guest: locked in this round
   lastResult: null, // host: last result message, resent to a guest who rejoins
+  jam: "",          // the host's Spotify Jam invite, so the guest can hear the music
 };
 
 const $ = (id) => document.getElementById(id);
@@ -418,6 +438,7 @@ const els = {
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
+  jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"),
   net: $("net"), netLed: $("netLed"), netText: $("netText"), netInvite: $("netInvite"), netBtn: $("netBtn"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
@@ -1289,7 +1310,27 @@ function netSendPos() {
 }
 
 function inviteUrl() {
-  return location.origin + location.pathname + "?join=" + net.code;
+  return location.origin + location.pathname + "?join=" + net.code + (net.jam ? "&jam=" + encodeURIComponent(net.jam) : "");
+}
+
+// only pass along real Spotify links (open.spotify.com/socialsession/…, spotify.link/…)
+function jamUrl(v) {
+  try {
+    const u = new URL(String(v || "").trim());
+    return u.protocol === "https:" && /(^|\.)spotify\.(com|link)$|^spotify\.app\.link$/.test(u.hostname) ? u.href : "";
+  } catch { return ""; }
+}
+
+function renderJam() {
+  const host = net.role === "host", guest = net.role === "guest";
+  const hostName = vs.players[0].name.trim() || "the host";
+  els.jam.classList.toggle("show", host || guest);
+  els.jamLink.hidden = !host;
+  els.jamJoin.hidden = !(guest && net.jam);
+  els.jamJoin.href = net.jam || "#";
+  els.jamJoin.textContent = "🎧 Join " + (vs.players[0].name.trim() ? hostName + "'s" : "the host's") + " Spotify Jam";
+  els.jamHint.hidden = !(guest && !net.jam);
+  els.jamHint.textContent = "no Jam link yet — ask " + hostName + " to start a Spotify Jam so you hear the music";
 }
 
 function renderNet() {
@@ -1303,6 +1344,7 @@ function renderNet() {
     : "same device — or";
   els.pName[0].readOnly = guest;
   els.pName[1].readOnly = host;
+  renderJam();
 }
 
 function makeCode() {
@@ -1317,6 +1359,7 @@ async function startHosting() {
   try { await loadPeerJs(); } catch (e) { net.role = null; renderNet(); setStatus("online play unavailable — " + e.message); return; }
   if (net.role !== "host") return;
   net.code = makeCode();
+  net.jam = jamUrl(els.jamLink.value);
   const peer = new Peer("gtt-" + net.code, peerOptions());
   net.peer = peer;
   peer.on("open", () => { console.log("[gtt] hosting room", net.code); renderNet(); });
@@ -1353,7 +1396,7 @@ function stopHosting(quiet) {
   if (net.role !== "host") return;
   netSend({ t: "bye" });
   const peer = net.peer;
-  Object.assign(net, { role: null, peer: null, conn: null, code: null, guestId: null, lastResult: null });
+  Object.assign(net, { role: null, peer: null, conn: null, code: null, guestId: null, lastResult: null, jam: "" });
   if (peer) setTimeout(() => peer.destroy(), 200);
   renderNet();
   if (!quiet) replayRound();
@@ -1361,7 +1404,7 @@ function stopHosting(quiet) {
 
 // bring a (re)joining guest up to date
 function netSync() {
-  netSend({ t: "hello", players: vs.players, imode: state.imode });
+  netSend({ t: "hello", players: vs.players, imode: state.imode, jam: net.jam });
   if (!state.track) return;
   const key = state.trackKey;
   if (state.revealed) {
@@ -1437,6 +1480,7 @@ function onGuestData(msg) {
   switch (msg.t) {
     case "hello":
       net.synced = true;
+      if (jamUrl(msg.jam)) net.jam = jamUrl(msg.jam);
       setPlayers(msg.players);
       if (msg.imode === "type" || msg.imode === "pick") setImode(msg.imode);
       renderNet();
@@ -1444,6 +1488,10 @@ function onGuestData(msg) {
     case "name":
       vs.players[0].name = str(msg.name, 12); els.pName[0].value = vs.players[0].name;
       renderNet();
+      break;
+    case "jam":
+      net.jam = jamUrl(msg.url);
+      renderJam();
       break;
     case "imode":
       if (msg.imode === "type" || msg.imode === "pick") setImode(msg.imode);
@@ -1496,8 +1544,8 @@ function onGuestData(msg) {
   }
 }
 
-async function startGuest(code) {
-  net.role = "guest"; net.code = code;
+async function startGuest(code, jam) {
+  net.role = "guest"; net.code = code; net.jam = jamUrl(jam);
   state.mode = "guest";
   vs.on = true;
   els.app.classList.add("vs", "guest");
@@ -1548,6 +1596,16 @@ function leaveRoom() {
   location.href = location.pathname;
 }
 
+els.jamLink.addEventListener("input", () => {
+  const v = els.jamLink.value.trim(), url = jamUrl(v);
+  els.jamLink.classList.toggle("ok", !!url);
+  els.jamLink.classList.toggle("bad", !!v && !url);
+  if (net.role !== "host" || url === net.jam || (v && !url)) return;
+  net.jam = url;
+  netSend({ t: "jam", url });
+  if (url) setStatus(netLinked() ? "Jam link sent to " + pname(1) : "Jam link added to the invite");
+});
+
 els.netBtn.onclick = () => {
   if (net.role === "guest") leaveRoom();
   else if (net.role === "host") stopHosting();
@@ -1557,15 +1615,16 @@ els.netInvite.onclick = async () => {
   const url = inviteUrl();
   const nav = els.app.ownerDocument.defaultView.navigator;
   try {
-    if (nav.share && matchMedia("(pointer: coarse)").matches) await nav.share({ title: "Guess the Track", text: "Join my Guess the Track room", url });
+    if (nav.share && matchMedia("(pointer: coarse)").matches) await nav.share({ title: "Guess the Track", text: "Join my Guess the Track room" + (net.jam ? " — the Spotify Jam button is inside" : ""), url });
     else { await nav.clipboard.writeText(url); setStatus("invite link copied — send it to your friend"); }
   } catch {
     setStatus("invite: " + url);
   }
 };
 
-const joinCode = new URL(location.href).searchParams.get("join");
-if (joinCode) startGuest(joinCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+const params = new URL(location.href).searchParams;
+const joinCode = params.get("join");
+if (joinCode) startGuest(joinCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8), params.get("jam"));
 else startSpotify();
 renderNet();
 </script>
