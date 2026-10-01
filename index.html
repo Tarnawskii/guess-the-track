@@ -183,6 +183,14 @@
   .pname::placeholder { color: var(--label2); }
   .stat.turn { border-color: var(--mustard); box-shadow: inset 0 0 0 1px var(--mustard), 0 0 0.75rem rgba(255, 194, 61, 0.25); }
   .stat.turn .pname, .stat.turn .pname::placeholder { color: var(--mustard); }
+  .stat.locked { border-color: var(--ok); }
+  .pname:read-only { cursor: default; }
+  #net { display: none; align-items: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2); }
+  #app.vs #net { display: flex; }
+  #netText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #net button { min-height: 2rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.6875rem; letter-spacing: 0.04em; }
+  #netInvite { background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip { display: none; }
   .plus {
     position: absolute; right: 0.5rem; top: -0.25rem; pointer-events: none;
     font-family: var(--groovy); font-size: 1rem; color: var(--ok);
@@ -305,6 +313,7 @@
     <button data-imode="pick" aria-pressed="false">Pick 5</button>
   </div>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
+  <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="netBtn">Play online</button></div>
   <div class="stage" id="stage">
     <div class="deck">
       <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label"></div></div></div>
@@ -355,7 +364,7 @@ const CONFIG = {
 const state = {
   mode: "idle",
   imode: "type", choicesFailed: false,
-  choice: { stage: 0, opts: null, accepted: null, results: [] },
+  choice: { stage: 0, opts: null, accepted: null, results: [], picks: [] },
   track: null,
   trackKey: null,
   revealed: false,
@@ -371,6 +380,16 @@ const vs = {
   next: 0,               // who guesses first on the next song (alternates)
   turn: 0,
   guesses: [null, null], // { marks: [artist, song, year], earned } once locked in
+};
+
+// online versus: the host (Spotify logged in) is player 0 and grades everything;
+// the guest (player 1) never sees the answer before the round resolves
+const net = {
+  role: null,       // null | "host" | "guest"
+  peer: null, conn: null, code: null,
+  guestId: null,    // host: device id of the seated guest, so a reload takes the seat back
+  myLocked: false,  // guest: locked in this round
+  lastResult: null, // host: last result message, resent to a guest who rejoins
 };
 
 const $ = (id) => document.getElementById(id);
@@ -399,6 +418,7 @@ const els = {
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
+  net: $("net"), netLed: $("netLed"), netText: $("netText"), netInvite: $("netInvite"), netBtn: $("netBtn"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
 
@@ -508,8 +528,8 @@ function burst() {
   }
 }
 
-function newRound(track, key) {
-  const timedOut = vs.on ? vsTimeUp() : "";
+function newRound(track, key, carry = "") {
+  const timedOut = !vs.on ? "" : net.role === "guest" ? carry : vsTimeUp();
   state.track = track; state.trackKey = key; state.revealed = false; state.choicesFailed = false;
   applyInputUI();
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
@@ -522,10 +542,12 @@ function newRound(track, key) {
   setStatus("new track — guess!");
   if (!els.app.classList.contains("pick") && els.app.ownerDocument.hasFocus()) els.artist.focus();
   if (vs.on) {
-    vs.guesses = [null, null];
-    vs.turn = vs.next; vs.next = 1 - vs.next;
-    vsTurnUI(timedOut);
+    vs.guesses = [null, null]; net.myLocked = false;
+    els.stP.forEach((el) => el.classList.remove("locked"));
+    if (net.role) vsOnlineUI(timedOut);
+    else { vs.turn = vs.next; vs.next = 1 - vs.next; vsTurnUI(timedOut); }
   } else setTurnHighlight(-1);
+  if (net.role === "host") netSend({ t: "round", key, carry: timedOut, players: vs.players });
   setupChoices(track);
 }
 
@@ -594,7 +616,12 @@ function finish(msg, win) {
 
 function reveal() {
   if (!state.track || state.revealed) return;
-  if (vs.on) { vsLock(["bad", "bad", "bad"], "passed"); return; }
+  if (vs.on) {
+    if (vsMeLocked()) return;
+    if (net.role === "guest") guestLock({ kind: "pass" });
+    else vsLock(["bad", "bad", "bad"], "passed");
+    return;
+  }
   state.rounds += 1; state.streak = 0;
   finish("revealed — 0 points");
 }
@@ -619,9 +646,10 @@ function setImode(imode) {
   els.imodes.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.imode === imode)));
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   fields.forEach((f) => setVerdict(f, null));
-  state.choice = { stage: 0, opts: null, accepted: null, results: [] };
+  state.choice = { stage: 0, opts: null, accepted: null, results: [], picks: [] };
   els.choiceList.replaceChildren();
   els.choiceLabel.textContent = "";
+  if (net.role === "host") netSend({ t: "imode", imode });
   if (imode === "pick" && state.track && !state.revealed) { setupChoices(state.track); return; }
   applyInputUI();
   if (imode === "pick") setStatus("pick mode on — options come with the next track");
@@ -629,11 +657,12 @@ function setImode(imode) {
 
 function setupChoices(track) {
   applyInputUI();
-  state.choice = { stage: 0, opts: null, accepted: null, results: [] };
+  state.choice = { stage: 0, opts: null, accepted: null, results: [], picks: [] };
   els.choiceList.replaceChildren();
   if (state.imode !== "pick" || !track || state.revealed) { els.choiceLabel.textContent = ""; return; }
   const seq = ++choiceSeq;
   els.choiceLabel.textContent = "loading choices…";
+  if (net.role === "guest") return; // the host sends the options
   const ready = fetchSpotifyPools(track);
   ready.then((pools) => {
     if (seq !== choiceSeq || state.revealed || state.track !== track) return;
@@ -644,7 +673,8 @@ function setupChoices(track) {
 function choicesFallback() {
   state.choicesFailed = true;
   applyInputUI();
-  setStatus("not enough to pick from — type it" + (vs.on ? " · " + pname(vs.turn) + "'s turn" : ""));
+  if (net.role === "host") netSend({ t: "choices", key: state.trackKey, failed: true });
+  setStatus("not enough to pick from — type it" + (vs.on && !net.role ? " · " + pname(vs.turn) + "'s turn" : ""));
   if (els.app.ownerDocument.hasFocus()) els.artist.focus();
 }
 
@@ -730,7 +760,8 @@ function buildChoices(pools, track) {
   if (opts[0].length < 2 || opts[1].length < 2 || opts[2].length < 2) { choicesFallback(); return; }
   state.choice.accepted = accepted;
   state.choice.opts = opts;
-  renderStage();
+  if (net.role === "host") netSend({ t: "choices", key: state.trackKey, opts });
+  if (!vsMeLocked()) renderStage();
 }
 
 function renderStage() {
@@ -751,15 +782,17 @@ function renderStage() {
 function pickOption(opt, btn) {
   const c = state.choice;
   if (!c.opts || state.revealed || c.results.length !== c.stage) return;
-  const ok = c.accepted[c.stage].includes(opt);
+  const ok = !!c.accepted && c.accepted[c.stage].includes(opt); // guests don't get the answers
   c.results.push(ok);
+  c.picks.push(opt);
   if (vs.on) {
     btn.classList.add("pick-sel");
     for (const b of els.choiceList.children) b.disabled = true;
     const stage = ++c.stage;
     setTimeout(() => {
-      if (state.choice !== c || state.revealed || c.stage !== stage) return;
+      if (state.choice !== c || state.revealed || c.stage !== stage || vsMeLocked()) return;
       if (stage < 3) renderStage();
+      else if (net.role === "guest") guestLock({ kind: "pick", picks: c.picks });
       else vsLock(c.results.map((r) => (r ? "ok" : "bad")));
     }, reduceMotion.matches ? 150 : 300);
     return;
@@ -807,15 +840,32 @@ function setTurnHighlight(i) {
   els.stP.forEach((el, j) => el.classList.toggle("turn", j === i));
 }
 
+function myIndex() {
+  return net.role === "guest" ? 1 : 0;
+}
+
+// online: has this device's player already locked in this round?
+function vsMeLocked() {
+  return net.role === "guest" ? net.myLocked : net.role === "host" ? !!vs.guesses[0] : false;
+}
+
+// restart the current song under new rules, unless its answer is already out
+function replayRound() {
+  if (!state.track || state.revealed) return false;
+  const t = state.track; state.track = null; newRound(t, state.trackKey);
+  return true;
+}
+
 function setVersus(on) {
+  if (!on && net.role === "host") stopHosting(true);
   vs.on = on;
   vs.players.forEach((p) => { p.points = 0; p.wins = 0; });
   vs.next = 0;
   els.app.classList.toggle("vs", on);
   els.vsBtn.setAttribute("aria-pressed", String(on));
   updateScore();
-  // replay the current song under the new rules, unless its answer is already out
-  if (state.track && !state.revealed) { const t = state.track; state.track = null; newRound(t, state.trackKey); return; }
+  renderNet();
+  if (replayRound()) return;
   setTurnHighlight(-1);
   setStatus(on ? "versus on — first song up next" : "solo mode");
 }
@@ -827,30 +877,63 @@ function vsTurnUI(prefix) {
   setTurnHighlight(vs.turn);
   setStatus((prefix ? prefix + " · " : "") + pname(vs.turn) + "'s turn — " + pname(1 - vs.turn) + ", eyes off");
   const c = state.choice;
-  if (usingPick() && c.opts) { c.stage = 0; c.results = []; renderStage(); }
+  if (usingPick() && c.opts) { c.stage = 0; c.results = []; c.picks = []; renderStage(); }
   else if (!usingPick() && els.app.ownerDocument.hasFocus()) els.artist.focus();
 }
 
-function vsLockTyped() {
+// online: no turns, both players guess at the same time
+function vsOnlineUI(prefix) {
+  els.artist.value = ""; els.song.value = ""; els.year.value = "";
+  fields.forEach((f) => setVerdict(f, null));
+  setTurnHighlight(-1);
+  const waiting = net.role === "host" && !netLinked();
+  setStatus((prefix ? prefix + " · " : "") + (waiting ? "waiting for a friend to join" : "go — you're both guessing"));
+  if (!usingPick() && els.app.ownerDocument.hasFocus()) els.artist.focus();
+}
+
+function gradeTyped(artist, song, year) {
   const t = state.track;
-  if (!els.artist.value.trim() && !els.song.value.trim() && !els.year.value.trim()) {
+  const yv = parseInt(year, 10);
+  const diff = isNaN(yv) ? Infinity : Math.abs(yv - t.third.answer);
+  return [
+    fuzzyMatch(artist, t.artists) ? "ok" : "bad",
+    fuzzyMatch(song, [t.song]) ? "ok" : "bad",
+    diff === 0 ? "ok" : diff <= 2 ? "close" : "bad",
+  ];
+}
+
+function vsLockTyped() {
+  if (vsMeLocked()) return;
+  const a = els.artist.value, s = els.song.value, y = els.year.value;
+  if (!a.trim() && !s.trim() && !y.trim()) {
     setStatus("type something — or Pass");
     return;
   }
-  const yv = parseInt(els.year.value, 10);
-  const diff = isNaN(yv) ? Infinity : Math.abs(yv - t.third.answer);
-  vsLock([
-    fuzzyMatch(els.artist.value, t.artists) ? "ok" : "bad",
-    fuzzyMatch(els.song.value, [t.song]) ? "ok" : "bad",
-    diff === 0 ? "ok" : diff <= 2 ? "close" : "bad",
-  ]);
+  if (net.role === "guest") guestLock({ kind: "type", a, s, y });
+  else vsLock(gradeTyped(a, s, y));
 }
 
-function vsLock(marks, verb = "locked in") {
-  const who = vs.turn, other = 1 - who;
+function vsLock(marks, verb = "locked in", who = net.role ? 0 : vs.turn) {
+  const other = 1 - who;
   vs.guesses[who] = { marks, earned: markPoints(marks) };
-  if (!vs.guesses[other]) { vs.turn = other; vsTurnUI(pname(who) + " " + verb); return; }
-  vsResolve();
+  els.stP[who].classList.add("locked");
+  if (vs.guesses[other]) { vsResolve(); return; }
+  if (net.role) {
+    if (who === 0) netSend({ t: "locked", who, verb });
+    showLocked(who, verb);
+    return;
+  }
+  vs.turn = other; vsTurnUI(pname(who) + " " + verb);
+}
+
+// online: one side is in, the other is still guessing
+function showLocked(who, verb) {
+  els.stP[who].classList.add("locked");
+  if (who === myIndex()) {
+    fields.forEach((f) => { f.querySelector("input").readOnly = true; });
+    if (usingPick()) { els.choiceList.replaceChildren(); els.choiceLabel.textContent = verb; }
+    setStatus(verb + " — waiting for " + pname(1 - who));
+  } else if (!vsMeLocked()) setStatus(pname(who) + " " + verb + " — your move");
 }
 
 // bank both players' points for this song; returns the winner's index, or -1 for a tie
@@ -869,10 +952,24 @@ function vsResultText(w) {
 }
 
 function vsResolve() {
-  els.artist.value = ""; els.song.value = ""; els.year.value = "";
+  if (!net.role) { els.artist.value = ""; els.song.value = ""; els.year.value = ""; }
   const w = vsScoreSong();
+  const msg = w < 0 ? vsResultText(w) : "far out — " + vsResultText(w);
+  if (net.role === "host") {
+    const t = state.track;
+    net.lastResult = {
+      t: "result", key: state.trackKey, w, msg, guesses: vs.guesses, players: vs.players,
+      track: { artists: t.artists, song: t.song, third: t.third, artUrl: t.artUrl },
+    };
+    netSend(net.lastResult);
+  }
+  vsShowResult(w, msg);
+}
+
+function vsShowResult(w, msg) {
   setTurnHighlight(-1);
-  finish(w < 0 ? vsResultText(w) : "far out — " + vsResultText(w), w >= 0);
+  els.stP.forEach((el) => el.classList.remove("locked"));
+  finish(msg, w >= 0);
   renderVsResult(w);
   vs.guesses.forEach((g, i) => { if (g.earned) popPoints(g.earned, els.stP[i]); });
   if (w >= 0) burst();
@@ -951,6 +1048,7 @@ async function pollSpotify() {
     setPlaying(!!data.is_playing);
     state.trackDuration = item.duration_ms || 0;
     state.pos = { position_ms: data.progress_ms || 0, timestamp_ms: Date.now(), speed: data.is_playing ? 1 : 0 };
+    netSendPos();
   } catch (e) {
     setStatus("connection glitch — retrying");
     setConn("off", "offline");
@@ -1075,7 +1173,13 @@ els.check.onclick = check;
 els.reveal.onclick = reveal;
 els.skip.onclick = () => {
   if (state.revealed || !state.track) return;
-  if (vs.on) { setTurnHighlight(-1); finish("skipped — no contest"); return; }
+  if (vs.on) {
+    if (net.role === "guest") return;
+    setTurnHighlight(-1);
+    finish("skipped — no contest");
+    if (net.role === "host") netSend({ t: "skip", key: state.trackKey, track: state.track });
+    return;
+  }
   state.rounds += 1; state.streak = 0; finish("skipped");
 };
 [els.artist, els.song, els.year].forEach((input, i, all) => {
@@ -1145,12 +1249,325 @@ els.pName.forEach((input, i) => {
   input.value = vs.players[i].name;
   input.addEventListener("input", () => {
     vs.players[i].name = input.value;
-    try { localStorage.setItem("gtt_players", JSON.stringify(vs.players.map((p) => p.name))); } catch {}
+    try {
+      const names = JSON.parse(localStorage.getItem("gtt_players") || "[]");
+      names[i] = input.value;
+      localStorage.setItem("gtt_players", JSON.stringify(names));
+    } catch {}
+    if (net.role) netSend({ t: "name", name: input.value });
   });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
 });
 
-startSpotify();
+// ---------- online play (PeerJS / WebRTC) ----------
+const PEERJS_URL = "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js";
+let peerLib = null;
+function loadPeerJs() {
+  return peerLib ||= new Promise((resolve, reject) => {
+    if (window.Peer) return resolve();
+    const s = document.createElement("script");
+    s.src = PEERJS_URL;
+    s.onload = () => resolve();
+    s.onerror = () => { peerLib = null; reject(new Error("couldn't load PeerJS")); };
+    document.head.appendChild(s);
+  });
+}
+const peerOptions = () => window.GTT_PEER_OPTIONS || {}; // override for a self-hosted PeerJS server
+
+function netLinked() {
+  return !!(net.conn && net.conn.open);
+}
+
+function netSend(msg) {
+  if (netLinked()) net.conn.send(msg);
+}
+
+function netSendPos() {
+  if (net.role !== "host" || !state.pos) return;
+  const p = state.pos;
+  netSend({ t: "pos", pos: p.position_ms + (Date.now() - p.timestamp_ms) * p.speed, dur: state.trackDuration, playing: !!p.speed });
+}
+
+function inviteUrl() {
+  return location.origin + location.pathname + "?join=" + net.code;
+}
+
+function renderNet() {
+  const host = net.role === "host", guest = net.role === "guest", linked = netLinked();
+  els.netBtn.textContent = guest ? "Leave" : host ? "Stop" : "Play online";
+  els.netInvite.hidden = !host || linked;
+  els.netLed.className = "led " + (linked ? "on" : net.role ? "wait" : "");
+  els.netText.textContent =
+    guest ? (linked ? "online · " + pname(0) + "'s room" : "joining room " + net.code + "…")
+    : host ? (!net.peer || !net.peer.open ? "opening a room…" : linked ? "online · " + pname(1) + " is in" : "room " + net.code)
+    : "same device — or";
+  els.pName[0].readOnly = guest;
+  els.pName[1].readOnly = host;
+}
+
+function makeCode() {
+  const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => abc[b % abc.length]).join("");
+}
+
+async function startHosting() {
+  if (net.role) return;
+  net.role = "host";
+  renderNet();
+  try { await loadPeerJs(); } catch (e) { net.role = null; renderNet(); setStatus("online play unavailable — " + e.message); return; }
+  if (net.role !== "host") return;
+  net.code = makeCode();
+  const peer = new Peer("gtt-" + net.code, peerOptions());
+  net.peer = peer;
+  peer.on("open", () => { console.log("[gtt] hosting room", net.code); renderNet(); });
+  peer.on("connection", (conn) => {
+    const id = conn.metadata && conn.metadata.id;
+    if (netLinked() && id !== net.guestId) {
+      conn.on("data", (m) => { if (m && m.t === "sync") { conn.send({ t: "full" }); setTimeout(() => conn.close(), 500); } });
+      return;
+    }
+    const old = net.conn;
+    net.conn = conn; net.guestId = id;
+    if (old) old.close();
+    conn.on("open", renderNet);
+    conn.on("data", (msg) => { try { onHostData(msg); } catch (e) { console.error("[gtt] bad message", e); } });
+    conn.on("close", () => {
+      if (net.conn !== conn) return;
+      net.conn = null; renderNet();
+      setStatus(pname(1) + " left — the invite still works");
+    });
+  });
+  peer.on("disconnected", () => { if (net.peer === peer && !peer.destroyed) peer.reconnect(); });
+  peer.on("error", (e) => {
+    console.error("[gtt] peer error", e.type, e);
+    if (net.peer !== peer) return;
+    if (e.type === "unavailable-id") { stopHosting(true); startHosting(); return; }
+    if (e.type === "network" || e.type === "server-error" || e.type === "socket-error" || e.type === "browser-incompatible") {
+      stopHosting(true); setStatus("couldn't open a room (" + e.type + ")");
+    }
+  });
+  replayRound();
+}
+
+function stopHosting(quiet) {
+  if (net.role !== "host") return;
+  netSend({ t: "bye" });
+  const peer = net.peer;
+  Object.assign(net, { role: null, peer: null, conn: null, code: null, guestId: null, lastResult: null });
+  if (peer) setTimeout(() => peer.destroy(), 200);
+  renderNet();
+  if (!quiet) replayRound();
+}
+
+// bring a (re)joining guest up to date
+function netSync() {
+  netSend({ t: "hello", players: vs.players, imode: state.imode });
+  if (!state.track) return;
+  const key = state.trackKey;
+  if (state.revealed) {
+    if (net.lastResult && net.lastResult.key === key) netSend(net.lastResult);
+    return;
+  }
+  netSend({ t: "round", key, carry: "", players: vs.players });
+  if (state.imode === "pick") {
+    if (state.choicesFailed) netSend({ t: "choices", key, failed: true });
+    else if (state.choice.opts) netSend({ t: "choices", key, opts: state.choice.opts });
+  }
+  vs.guesses.forEach((g, who) => { if (g) netSend({ t: "locked", who, verb: "locked in" }); });
+  netSendPos();
+  setStatus("your friend joined — go");
+}
+
+const BAD3 = ["bad", "bad", "bad"];
+const str = (v, max = 200) => String(v == null ? "" : v).slice(0, max);
+
+function onHostData(msg) {
+  if (!msg || typeof msg !== "object") return;
+  if (msg.t === "bye") { if (net.conn) net.conn.close(); return; }
+  if (msg.t === "sync") {
+    vs.players[1].name = str(msg.name, 12);
+    els.pName[1].value = vs.players[1].name;
+    netSync(); renderNet();
+    return;
+  }
+  if (msg.t === "name") {
+    vs.players[1].name = str(msg.name, 12);
+    els.pName[1].value = vs.players[1].name;
+    renderNet();
+    return;
+  }
+  if (msg.t !== "guess" || msg.key !== state.trackKey || !state.track || state.revealed || vs.guesses[1]) return;
+  let marks = BAD3;
+  if (msg.kind === "type") marks = gradeTyped(str(msg.a), str(msg.s), str(msg.y, 8));
+  else if (msg.kind === "pick" && state.choice.accepted && Array.isArray(msg.picks)) {
+    marks = state.choice.accepted.map((acc, i) => (acc.includes(str(msg.picks[i])) ? "ok" : "bad"));
+  }
+  vsLock(marks, msg.kind === "pass" ? "passed" : "locked in", 1);
+}
+
+function guestLock(guess) {
+  net.myLocked = true;
+  netSend({ t: "guess", key: state.trackKey, ...guess });
+  showLocked(1, guess.kind === "pass" ? "passed" : "locked in");
+}
+
+function setPlayers(players) {
+  if (!Array.isArray(players)) return;
+  players.slice(0, 2).forEach((p, i) => {
+    vs.players[i].points = Number(p.points) || 0;
+    vs.players[i].wins = Number(p.wins) || 0;
+    if (i === 0) { vs.players[0].name = str(p.name, 12); els.pName[0].value = vs.players[0].name; }
+  });
+  updateScore();
+}
+
+function cleanTrack(t) {
+  t = t || {};
+  const art = str(t.artUrl, 500);
+  return {
+    artists: Array.isArray(t.artists) ? t.artists.map((a) => str(a)) : [],
+    song: str(t.song),
+    third: { label: "year", answer: Number(t.third && t.third.answer) || 0 },
+    artUrl: art.startsWith("https://") ? art : null,
+  };
+}
+
+function onGuestData(msg) {
+  if (!msg || typeof msg !== "object") return;
+  switch (msg.t) {
+    case "hello":
+      net.synced = true;
+      setPlayers(msg.players);
+      if (msg.imode === "type" || msg.imode === "pick") setImode(msg.imode);
+      renderNet();
+      break;
+    case "name":
+      vs.players[0].name = str(msg.name, 12); els.pName[0].value = vs.players[0].name;
+      renderNet();
+      break;
+    case "imode":
+      if (msg.imode === "type" || msg.imode === "pick") setImode(msg.imode);
+      break;
+    case "round":
+      setPlayers(msg.players);
+      newRound({ pending: true }, str(msg.key), str(msg.carry));
+      break;
+    case "choices":
+      if (msg.key !== state.trackKey || state.revealed) break;
+      if (msg.failed || !Array.isArray(msg.opts)) { state.choicesFailed = true; applyInputUI(); break; }
+      state.choice = { stage: 0, opts: msg.opts.slice(0, 3).map((o) => (Array.isArray(o) ? o.slice(0, 5).map((x) => str(x)) : [])), accepted: null, results: [], picks: [] };
+      applyInputUI();
+      if (!net.myLocked) renderStage();
+      break;
+    case "locked":
+      if (msg.key !== undefined && msg.key !== state.trackKey) break;
+      if (msg.who === 1) net.myLocked = true;
+      if (msg.who === 0 || msg.who === 1) showLocked(msg.who, msg.verb === "passed" ? "passed" : "locked in");
+      break;
+    case "pos":
+      state.trackDuration = Number(msg.dur) || 0;
+      state.pos = { position_ms: Number(msg.pos) || 0, timestamp_ms: Date.now(), speed: msg.playing ? 1 : 0 };
+      setPlaying(!!msg.playing);
+      break;
+    case "result": {
+      if (msg.key !== state.trackKey || state.revealed) break;
+      state.track = cleanTrack(msg.track);
+      vs.guesses = [0, 1].map((i) => {
+        const g = (msg.guesses || [])[i] || {};
+        return { marks: [0, 1, 2].map((k) => (["ok", "close", "bad"].includes(g.marks && g.marks[k]) ? g.marks[k] : "bad")), earned: Number(g.earned) || 0 };
+      });
+      setPlayers(msg.players);
+      vsShowResult(msg.w === 0 || msg.w === 1 ? msg.w : -1, str(msg.msg));
+      break;
+    }
+    case "skip":
+      if (msg.key !== state.trackKey || state.revealed) break;
+      state.track = cleanTrack(msg.track);
+      finish("skipped — no contest");
+      break;
+    case "full":
+      net.synced = net.closedByHost = true;
+      setStatus("that room's full — two players max");
+      break;
+    case "bye":
+      net.closedByHost = true;
+      setStatus(pname(0) + " closed the room");
+      break;
+  }
+}
+
+async function startGuest(code) {
+  net.role = "guest"; net.code = code;
+  state.mode = "guest";
+  vs.on = true;
+  els.app.classList.add("vs", "guest");
+  els.imodes.forEach((b) => { b.disabled = true; });
+  setConn("wait", "no Spotify needed — the host is playing");
+  setStatus("joining room " + code + "…");
+  renderNet();
+  try { await loadPeerJs(); } catch (e) { setStatus("can't go online — " + e.message); return; }
+  const peer = new Peer(undefined, peerOptions());
+  net.peer = peer;
+  peer.on("open", () => {
+    const conn = peer.connect("gtt-" + code, { reliable: true, metadata: { id: deviceId() } });
+    net.conn = conn;
+    conn.on("open", () => {
+      setConn("on", "listening along with the host");
+      setStatus("joined — waiting for the next song");
+      const askSync = () => { if (!net.synced && net.conn === conn && conn.open) { netSend({ t: "sync", name: vs.players[1].name }); setTimeout(askSync, 2500); } };
+      askSync();
+      renderNet();
+    });
+    conn.on("data", (msg) => { try { onGuestData(msg); } catch (e) { console.error("[gtt] bad message", e); } });
+    conn.on("close", () => {
+      setConn("off", "disconnected"); renderNet();
+      if (!net.closedByHost) setStatus("lost the room — reload the invite to rejoin");
+    });
+  });
+  peer.on("error", (e) => {
+    console.error("[gtt] peer error", e.type, e);
+    if (e.type === "peer-unavailable") setStatus("no room " + code + " — check the invite");
+    else setStatus("connection problem (" + e.type + ") — reload to retry");
+    renderNet();
+  });
+}
+
+function deviceId() {
+  try {
+    let id = localStorage.getItem("gtt_device");
+    if (!id) { id = makeCode() + makeCode(); localStorage.setItem("gtt_device", id); }
+    return id;
+  } catch { return "anon"; }
+}
+
+// WebRTC can take ~30s to notice a closed tab, so say goodbye explicitly
+addEventListener("pagehide", () => netSend({ t: "bye" }));
+
+function leaveRoom() {
+  if (net.peer) net.peer.destroy();
+  location.href = location.pathname;
+}
+
+els.netBtn.onclick = () => {
+  if (net.role === "guest") leaveRoom();
+  else if (net.role === "host") stopHosting();
+  else startHosting();
+};
+els.netInvite.onclick = async () => {
+  const url = inviteUrl();
+  const nav = els.app.ownerDocument.defaultView.navigator;
+  try {
+    if (nav.share && matchMedia("(pointer: coarse)").matches) await nav.share({ title: "Guess the Track", text: "Join my Guess the Track room", url });
+    else { await nav.clipboard.writeText(url); setStatus("invite link copied — send it to your friend"); }
+  } catch {
+    setStatus("invite: " + url);
+  }
+};
+
+const joinCode = new URL(location.href).searchParams.get("join");
+if (joinCode) startGuest(joinCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+else startSpotify();
+renderNet();
 </script>
 </body>
 </html>
