@@ -116,13 +116,13 @@
   .led.off { background: var(--bad); box-shadow: 0 0 0.5rem rgba(255, 90, 79, 0.6); }
   @keyframes pulse { 50% { opacity: 0.35; } }
   .stage { position: relative; display: flex; align-items: center; gap: 0.75rem; }
-  .deck { position: relative; width: 7.5rem; height: 7.5rem; flex: none; margin-right: 3.5rem; }
+  .deck { position: relative; width: 7.5rem; height: 7.5rem; flex: none; margin-right: 4rem; }
   .record {
     position: absolute; top: 0.25rem; left: 0.25rem; width: 7rem; height: 7rem; border-radius: 50%;
     transition: transform 600ms var(--ease-out);
     box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.55);
   }
-  .stage.live .record { transform: translateX(3.5rem); }
+  .stage.live .record { transform: translateX(4rem); }
   .record::after {
     content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
     background: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.14) 12%, transparent 17% 55%, rgba(255, 255, 255, 0.09) 60%, transparent 65%);
@@ -135,9 +135,13 @@
     animation: spin 1.8s linear infinite; animation-play-state: paused;
   }
   .stage.playing .disc { animation-play-state: running; }
+  @property --lab1 { syntax: "<color>"; inherits: true; initial-value: #ffc23d; }
+  @property --lab2 { syntax: "<color>"; inherits: true; initial-value: #ff7a2f; }
   .disc-label {
     position: absolute; inset: 33%; border-radius: 50%;
-    background: linear-gradient(var(--mustard) 0 50%, var(--orange) 50%);
+    background: linear-gradient(var(--lab1) 0 50%, var(--lab2) 50%) center / cover no-repeat;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+    transition: --lab1 700ms var(--ease), --lab2 700ms var(--ease);
   }
   .disc-label::after { content: ""; position: absolute; inset: 42%; border-radius: 50%; background: #120a0e; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -169,8 +173,8 @@
     padding: 0.375rem 0.625rem; border-radius: 0.75rem;
     background: rgba(0, 0, 0, 0.28); border: 1px solid var(--hairline);
   }
-  .stat span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); }
-  .stat b { font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label2); }
+  .stat b { font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .stat.hot b { color: var(--mustard); }
   #vsScore { display: none; }
   #app.vs #score { display: none; }
@@ -279,11 +283,24 @@
   #status { font-size: 0.8125rem; font-weight: 500; color: var(--label2); min-height: 1.125rem; text-align: center; }
   #status.win { font-family: var(--groovy); font-size: 1.0625rem; color: var(--mustard); text-shadow: 1px 1px 0 var(--pink); }
   #answer {
-    font-size: 0.875rem; font-weight: 600; text-align: center; color: var(--cream); display: none;
-    padding: 0.625rem 0.75rem; border-radius: 0.875rem;
+    display: none; flex-direction: column; gap: 0.25rem;
+    padding: 0.5rem; border-radius: 0.875rem;
     background: rgba(0, 0, 0, 0.3);
     border: 1px dashed rgba(255, 194, 61, 0.4);
   }
+  .fasit-head { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); text-align: center; padding-bottom: 0.125rem; }
+  .fasit-row { display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: 0.5rem; padding: 0.25rem; border-radius: 0.625rem; opacity: 0.72; }
+  .fasit-row.now { opacity: 1; background: var(--fill); }
+  .fasit-art {
+    width: 2rem; height: 2rem; border-radius: 0.375rem; object-fit: cover; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--plum), var(--pink)); font-family: var(--groovy); font-size: 0.75rem; color: var(--cream);
+  }
+  .fasit-txt { min-width: 0; display: grid; line-height: 1.25; }
+  .fasit-txt b, .fasit-txt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fasit-txt b { font-size: 0.8125rem; font-weight: 700; color: var(--cream); }
+  .fasit-txt span { font-size: 0.6875rem; font-weight: 600; color: var(--label2); }
+  .fasit-pts { font-family: var(--groovy); font-size: 0.8125rem; color: var(--label3); padding-right: 0.25rem; }
+  .fasit-pts.won { color: var(--ok); }
   #answer.pop { animation: answer-in 280ms var(--ease-back); }
   @keyframes answer-in { from { opacity: 0; transform: scale(0.94); } }
   #vsResult {
@@ -307,7 +324,7 @@
   @media (prefers-reduced-motion: reduce) {
     .lava i, .disc, .led, .shake, .plus, #answer.pop, #vsResult.pop { animation: none; }
     .confetti { display: none; }
-    .cover-inner, .record, .field .v { transition: none; }
+    .cover-inner, .record, .field .v, .disc-label { transition: none; }
     button:active { transform: none; }
   }
 </style>
@@ -335,7 +352,7 @@
   </div>
   <div class="stage" id="stage">
     <div class="deck">
-      <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label"></div></div></div>
+      <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label" id="discLabel"></div></div></div>
       <div id="cover">
         <div class="cover-inner">
           <div class="cover-face cover-front">?</div>
@@ -376,7 +393,7 @@
 const CONFIG = {
   spotifyClientId: "fb91c824fe804c50a8b4b244288ebc6f",
   redirectUri: location.origin + location.pathname,
-  scopes: "user-read-currently-playing user-read-playback-state",
+  scopes: "user-read-currently-playing user-read-playback-state user-modify-playback-state",
   pollMs: 5000,
 };
 
@@ -390,6 +407,8 @@ const state = {
   rounds: 0, points: 0, streak: 0,
   token: null, lastPoll: 0, userName: null,
   pos: null, trackDuration: 0,
+  paid: [false, false, false], // pick mode: stages already paid out this song
+  colors: null,                // { key, colors } of the current song's label
 };
 
 // versus: two players on one device, one round per song
@@ -425,7 +444,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 console.log("[gtt] script loaded, protocol:", location.protocol);
 const els = {
-  app: $("app"), stage: $("stage"), cover: $("cover"), coverBack: $("coverBack"),
+  app: $("app"), stage: $("stage"), cover: $("cover"), coverBack: $("coverBack"), discLabel: $("discLabel"),
   progress: $("progress"), tNow: $("tNow"), tTotal: $("tTotal"),
   status: $("status"), answer: $("answer"),
   artist: $("gArtist"), song: $("gSong"), year: $("gYear"),
@@ -549,12 +568,75 @@ function burst() {
   }
 }
 
+// ---------- vinyl label: album colours while it plays, the cover once it's revealed
+const labelCache = new Map();
+
+function setLabelColors(cols) {
+  const s = els.discLabel.style;
+  if (cols) { s.setProperty("--lab1", cols[0]); s.setProperty("--lab2", cols[1]); }
+  else { s.removeProperty("--lab1"); s.removeProperty("--lab2"); }
+}
+
+function setLabelArt(url) {
+  els.discLabel.style.backgroundImage = url ? "url(" + JSON.stringify(url) + ")" : "";
+}
+
+// two dominant colours of the cover; null if the image can't be read (CORS, offline)
+function albumColors(url) {
+  if (!labelCache.has(url)) labelCache.set(url, new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { try { resolve(dominantColors(img)); } catch { resolve(null); } };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  }));
+  return labelCache.get(url);
+}
+
+function dominantColors(img) {
+  const n = 32, cv = document.createElement("canvas");
+  cv.width = cv.height = n;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, n, n);
+  const px = ctx.getImageData(0, 0, n, n).data;
+  const buckets = new Map();
+  for (let i = 0; i < px.length; i += 4) {
+    const k = (px[i] >> 5) << 6 | (px[i + 1] >> 5) << 3 | px[i + 2] >> 5;
+    const b = buckets.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+    b.n++; b.r += px[i]; b.g += px[i + 1]; b.b += px[i + 2];
+    buckets.set(k, b);
+  }
+  // favour colourful, mid-bright swatches over the black/white most covers are full of
+  const cols = [...buckets.values()].map(({ n: c, r, g, b }) => {
+    r /= c; g /= c; b /= c;
+    const max = Math.max(r, g, b), sat = max ? (max - Math.min(r, g, b)) / max : 0;
+    return { r, g, b, score: c * (0.25 + sat) * (max < 50 ? 0.3 : max > 235 && sat < 0.1 ? 0.5 : 1) };
+  }).sort((a, b) => b.score - a.score);
+  const dist = (a, b) => Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
+  const first = cols[0], second = cols.find((c) => dist(c, first) > 80) || first;
+  const hex = (c) => "#" + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  return [hex(first), hex(second)];
+}
+
+function colorLabel(track, key) {
+  if (!track.artUrl) { state.colors = null; setLabelColors(null); return; }
+  albumColors(track.artUrl).then((colors) => {
+    if (state.trackKey !== key) return;
+    state.colors = colors && { key, colors };
+    setLabelColors(colors);
+    if (colors && net.role === "host") netSend({ t: "colors", key, colors });
+  });
+}
+
 function newRound(track, key, carry = "") {
   const timedOut = !vs.on ? "" : net.role === "guest" ? carry : vsTimeUp();
   state.track = track; state.trackKey = key; state.revealed = false; state.choicesFailed = false;
+  state.paid = [false, false, false];
   applyInputUI();
+  setLabelArt(null);
+  if (net.role !== "guest") colorLabel(track, key);
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
-  els.answer.style.display = "none"; els.answer.textContent = "";
+  els.answer.style.display = "none"; els.answer.replaceChildren();
   els.answer.classList.remove("pop");
   els.vsResult.style.display = "none"; els.vsResult.classList.remove("pop");
   fields.forEach((f) => setVerdict(f, null));
@@ -572,9 +654,44 @@ function newRound(track, key, carry = "") {
   setupChoices(track);
 }
 
-function answerText() {
+// answer key: the last 5 songs, newest first, kept across reloads for practice
+const FASIT_MAX = 5;
+let fasit = [];
+try { fasit = (JSON.parse(localStorage.getItem("gtt_fasit")) || []).slice(0, FASIT_MAX); } catch {}
+
+function addFasit(note) {
   const t = state.track;
-  return `${t.artists.join(", ")} — "${t.song}" (${t.third.answer})`;
+  fasit = fasit.filter((f) => f.key !== state.trackKey);
+  fasit.unshift({ key: state.trackKey, artists: t.artists, song: t.song, year: t.third.answer, artUrl: t.artUrl || null, note: note || "" });
+  fasit.length = Math.min(fasit.length, FASIT_MAX);
+  try { localStorage.setItem("gtt_fasit", JSON.stringify(fasit)); } catch {}
+}
+
+function renderFasit() {
+  const head = document.createElement("div");
+  head.className = "fasit-head";
+  head.textContent = "answer key · last " + fasit.length;
+  const rows = fasit.map((f, i) => {
+    const row = document.createElement("div");
+    row.className = "fasit-row" + (i === 0 ? " now" : "");
+    let art;
+    if (f.artUrl) { art = document.createElement("img"); art.src = f.artUrl; art.alt = ""; }
+    else { art = document.createElement("i"); art.textContent = (f.song.match(/\b\p{L}/gu) || ["♪"]).slice(0, 2).join("").toUpperCase(); }
+    art.className = "fasit-art";
+    const txt = document.createElement("div");
+    txt.className = "fasit-txt";
+    const song = document.createElement("b");
+    song.textContent = f.song;
+    const meta = document.createElement("span");
+    meta.textContent = f.artists.join(", ") + " · " + f.year;
+    txt.append(song, meta);
+    const pts = document.createElement("span");
+    pts.className = "fasit-pts" + (f.note.startsWith("+") ? " won" : "");
+    pts.textContent = f.note;
+    row.append(art, txt, pts);
+    return row;
+  });
+  els.answer.replaceChildren(head, ...rows);
 }
 
 function check() {
@@ -604,7 +721,7 @@ function check() {
   if (complete) {
     state.rounds += 1; state.points += earned;
     state.streak = state.streak + 1;
-    finish(state.streak >= 3 ? `far out! ${state.streak} in a row` : "groovy! nailed it", true);
+    finish(state.streak >= 3 ? `far out! ${state.streak} in a row` : "groovy! nailed it", true, "+" + earned);
     popPoints(earned);
     burst();
     return;
@@ -615,12 +732,14 @@ function check() {
   if (firstBad) firstBad.querySelector("input").focus();
 }
 
-function finish(msg, win) {
+// note: what this song scored, shown in the answer key ("+3", "skipped", "2–1" in versus)
+function finish(msg, win, note) {
   state.revealed = true;
   setStatus(msg, win);
   updateScore();
-  els.answer.textContent = answerText();
-  els.answer.style.display = "block";
+  addFasit(note);
+  renderFasit();
+  els.answer.style.display = "flex";
   els.answer.classList.add("pop");
   fields.forEach((f) => { f.querySelector("input").readOnly = true; });
   for (const b of els.choiceList.querySelectorAll("button")) b.disabled = true;
@@ -629,6 +748,7 @@ function finish(msg, win) {
     img.src = state.track.artUrl;
     img.alt = "";
     els.coverBack.replaceChildren(img);
+    setLabelArt(state.track.artUrl);
   } else {
     els.coverBack.textContent = (state.track.song.match(/\b\p{L}/gu) || ["♪"]).slice(0, 2).join("").toUpperCase();
   }
@@ -644,7 +764,7 @@ function reveal() {
     return;
   }
   state.rounds += 1; state.streak = 0;
-  finish("revealed — 0 points");
+  finish("revealed — 0 points", false, "revealed");
 }
 
 let choiceSeq = 0;
@@ -819,6 +939,14 @@ function pickOption(opt, btn) {
     return;
   }
   btn.classList.add(ok ? "pick-ok" : "pick-bad");
+  if (ok && !state.paid[c.stage]) {
+    // paid once per stage per song, so flipping Type/Pick can't farm points
+    const pts = STAGE_POINTS[c.stage];
+    state.paid[c.stage] = true;
+    state.points += pts;
+    updateScore();
+    popPoints(pts);
+  }
   const answer = c.accepted[c.stage][0];
   for (const b of els.choiceList.children) {
     b.disabled = true;
@@ -834,17 +962,17 @@ function pickOption(opt, btn) {
 }
 
 function finishPick() {
-  const right = state.choice.results.filter(Boolean).length;
+  const results = state.choice.results;
+  const right = results.filter(Boolean).length;
+  const earned = markPoints(results.map((r) => (r ? "ok" : "bad")));
   state.rounds += 1;
   if (right === 3) {
-    state.points += 4;
     state.streak = state.streak + 1;
-    finish(state.streak >= 3 ? `far out! ${state.streak} in a row` : "groovy! nailed it", true);
-    popPoints(4);
+    finish(state.streak >= 3 ? `far out! ${state.streak} in a row` : "groovy! nailed it", true, "+" + earned);
     burst();
   } else {
     state.streak = 0;
-    finish(`${right}/3 right — next one's yours`);
+    finish(`${right}/3 right · +${earned} — next one's yours`, false, earned ? "+" + earned : "0");
   }
   els.choiceLabel.textContent = "next track inbound…";
 }
@@ -853,8 +981,10 @@ function pname(i) {
   return vs.players[i].name.trim() || "Player " + (i + 1);
 }
 
+const STAGE_POINTS = [1, 1, 2]; // artist, song, year
+
 function markPoints(marks) {
-  return (marks[0] === "ok") + (marks[1] === "ok") + (marks[2] === "ok" ? 2 : marks[2] === "close" ? 1 : 0);
+  return marks.reduce((sum, m, i) => sum + (m === "ok" ? STAGE_POINTS[i] : m === "close" ? 1 : 0), 0);
 }
 
 function setTurnHighlight(i) {
@@ -990,7 +1120,7 @@ function vsResolve() {
 function vsShowResult(w, msg) {
   setTurnHighlight(-1);
   els.stP.forEach((el) => el.classList.remove("locked"));
-  finish(msg, w >= 0);
+  finish(msg, w >= 0, vs.guesses.map((g) => g.earned).join("–"));
   renderVsResult(w);
   vs.guesses.forEach((g, i) => { if (g.earned) popPoints(g.earned, els.stP[i]); });
   if (w >= 0) burst();
@@ -1037,9 +1167,9 @@ setInterval(() => {
   }
 }, 250);
 
-async function api(url) {
-  const res = await fetch(url, { headers: { Authorization: "Bearer " + state.token } });
-  if (res.status === 401 && await refreshAccessToken()) return api(url);
+async function api(url, opts = {}) {
+  const res = await fetch(url, { ...opts, headers: { Authorization: "Bearer " + state.token } });
+  if (res.status === 401 && await refreshAccessToken()) return api(url, opts);
   return res;
 }
 
@@ -1116,6 +1246,7 @@ function loadToken() {
     if (!raw) return false;
     const auth = JSON.parse(raw);
     if (auth.expiresAt && Date.now() > auth.expiresAt - 30000) return false;
+    if (auth.scope === undefined) return false; // saved before Skip needed playback control
     state.token = auth.access;
     return true;
   } catch { return false; }
@@ -1123,9 +1254,12 @@ function loadToken() {
 
 async function saveAuth(auth) {
   state.token = auth.access_token;
+  let prev = {};
+  try { prev = JSON.parse(localStorage.getItem("pip_widget_auth")) || {}; } catch {}
   localStorage.setItem("pip_widget_auth", JSON.stringify({
+    scope: auth.scope || prev.scope || "",
     access: auth.access_token,
-    refresh: auth.refresh_token,
+    refresh: auth.refresh_token || prev.refresh,
     expiresAt: Date.now() + (auth.expires_in || 3600) * 1000,
   }));
 }
@@ -1192,17 +1326,43 @@ els.imodes.forEach((b) => {
 });
 els.check.onclick = check;
 els.reveal.onclick = reveal;
+// skip = give up on this song (if it's still open) and jump to the next one in Spotify
 els.skip.onclick = () => {
-  if (state.revealed || !state.track) return;
-  if (vs.on) {
-    if (net.role === "guest") return;
-    setTurnHighlight(-1);
-    finish("skipped — no contest");
-    if (net.role === "host") netSend({ t: "skip", key: state.trackKey, track: state.track });
-    return;
+  if (net.role === "guest" || state.mode !== "spotify") return;
+  if (state.track && !state.revealed) {
+    if (vs.on) {
+      setTurnHighlight(-1);
+      finish("skipped — no contest", false, "skipped");
+      if (net.role === "host") netSend({ t: "skip", key: state.trackKey, track: state.track });
+    } else { state.rounds += 1; state.streak = 0; finish("skipped", false, "skipped"); }
   }
-  state.rounds += 1; state.streak = 0; finish("skipped");
+  skipTrack();
 };
+
+async function skipTrack() {
+  if (els.skip.disabled) return;
+  els.skip.disabled = true;
+  try {
+    const res = await api("https://api.spotify.com/v1/me/player/next", { method: "POST" });
+    if (res.ok) {
+      // Spotify takes a beat to report the new song
+      setTimeout(pollSpotify, 500); setTimeout(pollSpotify, 1500);
+      return;
+    }
+    let err = {};
+    try { err = (await res.json()).error || {}; } catch {}
+    console.error("[gtt] skip failed:", res.status, err);
+    if (res.status === 401 || /scope/i.test(err.message || "")) setStatus("can't skip — hit reconnect to give it permission");
+    else if (res.status === 403) setStatus("skipping needs Spotify Premium — skip in Spotify instead");
+    else if (res.status === 404) setStatus("no active Spotify player — press play in Spotify first");
+    else if (res.status === 429) setStatus("easy there — Spotify says slow down");
+    else setStatus("couldn't skip (" + res.status + ")");
+  } catch {
+    setStatus("couldn't reach Spotify to skip");
+  } finally {
+    setTimeout(() => { els.skip.disabled = false; }, 800);
+  }
+}
 [els.artist, els.song, els.year].forEach((input, i, all) => {
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || e.ctrlKey || e.metaKey) return;
@@ -1417,6 +1577,7 @@ function netSync() {
     else if (state.choice.opts) netSend({ t: "choices", key, opts: state.choice.opts });
   }
   vs.guesses.forEach((g, who) => { if (g) netSend({ t: "locked", who, verb: "locked in" }); });
+  if (state.colors && state.colors.key === key) netSend({ t: "colors", key, colors: state.colors.colors });
   netSendPos();
   setStatus("your friend joined — go");
 }
@@ -1512,6 +1673,10 @@ function onGuestData(msg) {
       if (msg.who === 1) net.myLocked = true;
       if (msg.who === 0 || msg.who === 1) showLocked(msg.who, msg.verb === "passed" ? "passed" : "locked in");
       break;
+    case "colors":
+      if (msg.key !== state.trackKey || !Array.isArray(msg.colors)) break;
+      if (msg.colors.length === 2 && msg.colors.every((c) => /^#[0-9a-f]{6}$/i.test(c))) setLabelColors(msg.colors);
+      break;
     case "pos":
       state.trackDuration = Number(msg.dur) || 0;
       state.pos = { position_ms: Number(msg.pos) || 0, timestamp_ms: Date.now(), speed: msg.playing ? 1 : 0 };
@@ -1531,7 +1696,7 @@ function onGuestData(msg) {
     case "skip":
       if (msg.key !== state.trackKey || state.revealed) break;
       state.track = cleanTrack(msg.track);
-      finish("skipped — no contest");
+      finish("skipped — no contest", false, "skipped");
       break;
     case "full":
       net.synced = net.closedByHost = true;
