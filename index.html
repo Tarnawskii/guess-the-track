@@ -1207,6 +1207,7 @@ async function pollSpotify() {
     if (!res.ok) {
       setConn("off", "error " + res.status);
       if (res.status === 401) setStatus("Spotify login expired — hit reconnect");
+      if (res.status === 403) notAllowed();
       return;
     }
     state.lastPoll = Date.now();
@@ -1262,11 +1263,18 @@ async function startSpotify() {
   try {
     const me = await api("https://api.spotify.com/v1/me");
     if (me.ok) { const u = await me.json(); state.userName = u.display_name || u.id; }
+    else if (me.status === 403) { setConn("off", "account not allowed"); notAllowed(); }
   } catch {}
   console.log("[gtt] spotify mode starting");
   setStatus("listening…");
   pollSpotify();
   state.pollTimer = setInterval(pollSpotify, CONFIG.pollMs);
+}
+
+// a Spotify app in Development mode only serves accounts its owner added by hand
+function notAllowed() {
+  setConn("off", "account not allowed");
+  setStatus("Spotify blocked this account (403) — the app owner has to add your Spotify email under User Management in the Spotify dashboard. Or join a friend's room with their invite link, no Spotify needed.");
 }
 
 function loadToken() {
