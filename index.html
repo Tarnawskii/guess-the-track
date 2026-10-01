@@ -101,7 +101,6 @@
   #conn { display: flex; align-items: center; justify-content: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2); min-height: 1rem; }
   .led { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--label3); flex: none; transition: background-color 200ms var(--ease); }
   .led.on { background: var(--ok); box-shadow: 0 0 0.5rem rgba(168, 224, 99, 0.7); animation: pulse 2.4s infinite; }
-  .led.demo { background: var(--mustard); box-shadow: 0 0 0.5rem rgba(255, 194, 61, 0.5); animation: pulse 2.4s infinite; }
   .led.wait { background: var(--mustard); animation: pulse 0.9s infinite; }
   .led.off { background: var(--bad); box-shadow: 0 0 0.5rem rgba(255, 90, 79, 0.6); }
   @keyframes pulse { 50% { opacity: 0.35; } }
@@ -260,10 +259,6 @@
     <h1>Guess the Track</h1>
     <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
   </header>
-  <div class="seg" role="group" aria-label="Source">
-    <button data-mode="spotify" aria-pressed="false">Spotify</button>
-    <button data-mode="demo" aria-pressed="false">Demo</button>
-  </div>
   <div class="seg" role="group" aria-label="Guess style">
     <button data-imode="type" aria-pressed="true">Type</button>
     <button data-imode="pick" aria-pressed="false">Pick 5</button>
@@ -298,7 +293,7 @@
     <button id="reveal">Reveal</button>
     <button id="skip">Skip</button>
   </div>
-  <div id="status" role="status" aria-live="polite">pick a source — Demo needs no login</div>
+  <div id="status" role="status" aria-live="polite">connecting…</div>
   <div id="answer"></div>
   <footer><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</footer>
 </div>
@@ -308,7 +303,6 @@ const CONFIG = {
   redirectUri: location.origin + location.pathname,
   scopes: "user-read-currently-playing user-read-playback-state",
   pollMs: 5000,
-  demoTrackMs: 45000,
 };
 
 const state = {
@@ -319,7 +313,6 @@ const state = {
   trackKey: null,
   revealed: false,
   rounds: 0, points: 0, streak: 0,
-  demoStart: 0, demoIndex: -1,
   token: null, lastPoll: 0, userName: null,
   pos: null, trackDuration: 0,
 };
@@ -345,7 +338,7 @@ const els = {
   sPoints: $("sPoints"), sStreak: $("sStreak"), sRounds: $("sRounds"),
   stPoints: $("stPoints"), stStreak: $("stStreak"),
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
-  pipBtn: $("pipBtn"), segs: document.querySelectorAll("[data-mode]"),
+  pipBtn: $("pipBtn"),
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"),
@@ -355,11 +348,6 @@ const fields = [els.fArtist, els.fSong, els.fYear];
 function setConn(cls, text) {
   els.led.className = "led " + cls;
   if (text) els.connText.textContent = text;
-}
-
-function setMode(mode) {
-  state.mode = mode;
-  els.segs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
 }
 
 function setPlaying(on) {
@@ -372,26 +360,11 @@ function setStatus(text, win) {
 }
 
 setInterval(() => {
-  if (state.mode === "spotify") {
-    if (!state.lastPoll) return;
-    const age = Math.round((Date.now() - state.lastPoll) / 1000);
-    if (age > 15) setConn("off", "stale · " + age + "s");
-    else setConn("on", (state.userName ? "live: " + state.userName : "live") + " · " + age + "s");
-  }
+  if (state.mode !== "spotify" || !state.lastPoll) return;
+  const age = Math.round((Date.now() - state.lastPoll) / 1000);
+  if (age > 15) setConn("off", "stale · " + age + "s");
+  else setConn("on", (state.userName ? "live: " + state.userName : "live") + " · " + age + "s");
 }, 1000);
-
-const DEMO_TRACKS = [
-  { artist: "a-ha", song: "Take On Me", year: 1985 },
-  { artist: "Nirvana", song: "Smells Like Teen Spirit", year: 1991 },
-  { artist: "Daft Punk", song: "Get Lucky", year: 2013 },
-  { artist: "The Weeknd", song: "Blinding Lights", year: 2019 },
-  { artist: "Kate Bush", song: "Running Up That Hill", year: 1985 },
-  { artist: "Toto", song: "Africa", year: 1982 },
-  { artist: "Bee Gees", song: "Stayin' Alive", year: 1977 },
-  { artist: "ABBA", song: "Dancing Queen", year: 1976 },
-  { artist: "Earth, Wind & Fire", song: "September", year: 1978 },
-  { artist: "Chic", song: "Le Freak", year: 1978 },
-];
 
 function normalize(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
@@ -593,7 +566,7 @@ function setupChoices(track) {
   if (state.imode !== "pick" || !track || state.revealed) { els.choiceLabel.textContent = ""; return; }
   const seq = ++choiceSeq;
   els.choiceLabel.textContent = "loading choices…";
-  const ready = state.mode === "spotify" ? fetchSpotifyPools(track) : Promise.resolve(demoPools(track));
+  const ready = fetchSpotifyPools(track);
   ready.then((pools) => {
     if (seq !== choiceSeq || state.revealed || state.track !== track) return;
     buildChoices(pools, track);
@@ -605,11 +578,6 @@ function choicesFallback() {
   applyInputUI();
   setStatus("not enough to pick from — type it");
   if (els.app.ownerDocument.hasFocus()) els.artist.focus();
-}
-
-function demoPools(track) {
-  const others = DEMO_TRACKS.filter((t) => t.song !== track.song || t.artist !== track.artists[0]);
-  return { artists: others.map((t) => t.artist), songs: others.map((t) => t.song), years: others.map((t) => t.year) };
 }
 
 async function fetchSpotifyPools(track) {
@@ -748,40 +716,9 @@ function finishPick() {
   els.choiceLabel.textContent = "next track inbound…";
 }
 
-function startDemo() {
-  stopSpotify();
-  setMode("demo");
-  applyInputUI();
-  setConn("demo", "demo · " + Math.round(CONFIG.demoTrackMs / 1000) + "s per track");
-  console.log("[gtt] demo mode started");
-  nextDemoTrack();
-}
-
-function stopDemo() {
-  state.demoStart = 0;
-}
-
-function stopSpotify() {
-  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
-}
-
-function nextDemoTrack() {
-  let i;
-  do { i = Math.floor(Math.random() * DEMO_TRACKS.length); } while (i === state.demoIndex && DEMO_TRACKS.length > 1);
-  state.demoIndex = i;
-  const t = DEMO_TRACKS[i];
-  state.demoStart = Date.now();
-  setPlaying(true);
-  newRound({ artists: [t.artist], song: t.song, third: { label: "year", answer: t.year }, artUrl: null }, "demo:" + t.song + Math.random());
-}
-
-// one ticker drives the bar for every mode; spotify interpolates from last known position
+// progress bar ticker; interpolates from last known spotify position
 setInterval(() => {
-  if (state.mode === "demo" && state.demoStart) {
-    const elapsed = Date.now() - state.demoStart;
-    setProgress(elapsed, CONFIG.demoTrackMs);
-    if (elapsed >= CONFIG.demoTrackMs) nextDemoTrack();
-  } else if (state.mode === "spotify" && state.pos && state.trackDuration) {
+  if (state.pos && state.trackDuration) {
     const elapsed = state.pos.position_ms + (Date.now() - state.pos.timestamp_ms) * (state.pos.speed || 0);
     setProgress(elapsed, state.trackDuration);
   }
@@ -794,7 +731,6 @@ async function api(url) {
 }
 
 async function pollSpotify() {
-  if (state.mode !== "spotify") return;
   try {
     const res = await api("https://api.spotify.com/v1/me/player/currently-playing");
     if (res.status === 204) { setStatus("nothing playing — start a song in Spotify"); setPlaying(false); state.lastPoll = Date.now(); return; }
@@ -841,9 +777,9 @@ async function startSpotify() {
     await redirectToSpotify();
     return;
   }
-  stopDemo();
-  setMode("spotify");
+  state.mode = "spotify";
   applyInputUI();
+  if (state.pollTimer) clearInterval(state.pollTimer);
   state.pos = null; state.trackDuration = 0;
   setConn("wait", "connecting…");
   try {
@@ -933,17 +869,12 @@ async function refreshAccessToken() {
   } catch { return false; }
 }
 
-const START = { spotify: startSpotify, demo: startDemo };
-els.segs.forEach((b) => {
-  b.onclick = () => { if (b.dataset.mode !== state.mode) START[b.dataset.mode](); };
-});
 els.imodes.forEach((b) => {
   b.onclick = () => setImode(b.dataset.imode);
 });
 els.check.onclick = check;
 els.reveal.onclick = reveal;
 els.skip.onclick = () => {
-  if (state.mode === "demo") { nextDemoTrack(); return; }
   if (!state.revealed && state.track) { state.rounds += 1; state.streak = 0; finish("skipped"); }
 };
 [els.artist, els.song, els.year].forEach((input, i, all) => {
@@ -988,7 +919,7 @@ async function togglePip() {
 }
 els.pipBtn.onclick = togglePip;
 
-if (new URL(location.href).searchParams.has("code")) startSpotify();
+startSpotify();
 </script>
 </body>
 </html>
