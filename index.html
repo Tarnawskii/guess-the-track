@@ -88,7 +88,14 @@
   button:active { transform: scale(0.96); }
   button:disabled { opacity: 0.4; cursor: default; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--mustard); outline-offset: 2px; }
-  #pipBtn { width: 2.75rem; padding: 0; font-size: 1.125rem; border-radius: 50%; }
+  .hbtns { display: flex; gap: 0.375rem; }
+  #pipBtn, #vsBtn { width: 2.75rem; padding: 0; font-size: 1.125rem; border-radius: 50%; }
+  #vsBtn { font-family: var(--groovy); font-weight: 400; font-size: 0.875rem; color: var(--label2); }
+  #vsBtn[aria-pressed="true"] {
+    background: linear-gradient(135deg, var(--mustard), var(--orange));
+    color: var(--ink); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.35);
+  }
+  #app.vs .solo-only, #app:not(.vs) .vs-only { display: none; }
   .seg { display: flex; gap: 0.25rem; padding: 0.25rem; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline); border-radius: 999px; }
   .seg button { flex: 1; min-height: 2.25rem; border-radius: 999px; background: transparent; color: var(--label2); letter-spacing: 0.04em; }
   @media (hover: hover) and (pointer: fine) {
@@ -161,6 +168,17 @@
   .stat span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); }
   .stat b { font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .stat.hot b { color: var(--mustard); }
+  #vsScore { display: none; }
+  #app.vs #score { display: none; }
+  #app.vs #vsScore { display: grid; }
+  .pname {
+    flex: 1; width: 0; min-width: 0; padding: 0; border: 0; border-radius: 0.25rem; background: transparent;
+    font: inherit; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2);
+    text-overflow: ellipsis;
+  }
+  .pname::placeholder { color: var(--label2); }
+  .stat.turn { border-color: var(--mustard); box-shadow: inset 0 0 0 1px var(--mustard), 0 0 0.75rem rgba(255, 194, 61, 0.25); }
+  .stat.turn .pname, .stat.turn .pname::placeholder { color: var(--mustard); }
   .plus {
     position: absolute; right: 0.5rem; top: -0.25rem; pointer-events: none;
     font-family: var(--groovy); font-size: 1rem; color: var(--ok);
@@ -242,10 +260,26 @@
   }
   #answer.pop { animation: answer-in 280ms var(--ease-back); }
   @keyframes answer-in { from { opacity: 0; transform: scale(0.94); } }
+  #vsResult {
+    display: none; gap: 0.3125rem; padding: 0.5rem 0.625rem; border-radius: 0.875rem;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline);
+  }
+  #vsResult.pop { animation: answer-in 280ms var(--ease-back); }
+  .vsrow { display: grid; grid-template-columns: 1fr auto 2rem; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--label2); }
+  .vsrow span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vsrow b { font-family: var(--groovy); font-weight: 400; text-align: right; }
+  .vsrow.won { color: var(--mustard); }
+  .chips { display: flex; gap: 0.25rem; }
+  .chip { width: 1.25rem; height: 1.25rem; border-radius: 0.375rem; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 0.625rem; font-weight: 800; color: var(--ink); }
+  .chip.ok { background: var(--ok); }
+  .chip.close { background: var(--close); }
+  .chip.bad { background: rgba(255, 90, 79, 0.35); color: var(--cream); }
+  #choiceList button.pick-sel { box-shadow: inset 0 0 0 2px var(--mustard); color: var(--mustard); }
+  #choiceList button.pick-sel:disabled { opacity: 1; }
   footer { font-size: 0.6875rem; color: var(--label3); text-align: center; letter-spacing: 0.03em; }
   kbd { font: inherit; font-weight: 700; color: var(--label2); padding: 0 0.25rem; border-radius: 0.25rem; background: var(--fill); }
   @media (prefers-reduced-motion: reduce) {
-    .lava i, .disc, .led, .shake, .plus, #answer.pop { animation: none; }
+    .lava i, .disc, .led, .shake, .plus, #answer.pop, #vsResult.pop { animation: none; }
     .confetti { display: none; }
     .cover-inner, .record, .field .v { transition: none; }
     button:active { transform: none; }
@@ -257,7 +291,10 @@
   <div class="lava" aria-hidden="true"><i></i><i></i><i></i></div>
   <header>
     <h1>Guess the Track</h1>
-    <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
+    <div class="hbtns">
+      <button id="vsBtn" aria-pressed="false" title="Two-player versus" aria-label="Two-player versus">VS</button>
+      <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
+    </div>
   </header>
   <div class="seg" role="group" aria-label="Guess style">
     <button data-imode="type" aria-pressed="true">Type</button>
@@ -279,6 +316,11 @@
       <div class="stat" id="stStreak"><span>Streak</span><b id="sStreak">0</b></div>
       <div class="stat"><span>Rounds</span><b id="sRounds">0</b></div>
     </div>
+    <div class="stats" id="vsScore">
+      <div class="stat" id="stP0"><input class="pname" id="pName0" placeholder="Player 1" maxlength="12" aria-label="Player 1 name" autocomplete="off" /><b id="sP0">0</b></div>
+      <div class="stat" id="stP1"><input class="pname" id="pName1" placeholder="Player 2" maxlength="12" aria-label="Player 2 name" autocomplete="off" /><b id="sP1">0</b></div>
+      <div class="stat"><span>Songs</span><b id="sWins">0–0</b></div>
+    </div>
   </div>
   <div class="prog"><span id="tNow">0:00</span><div class="bar"><div id="progress"></div></div><span id="tTotal">0:00</span></div>
   <label class="field" id="fArtist"><input id="gArtist" placeholder="Artist" aria-label="Artist" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
@@ -289,13 +331,14 @@
     <div id="choiceList"></div>
   </div>
   <div class="actions">
-    <button id="check">Check</button>
-    <button id="reveal">Reveal</button>
+    <button id="check"><span class="solo-only">Check</span><span class="vs-only">Lock in</span></button>
+    <button id="reveal"><span class="solo-only">Reveal</span><span class="vs-only">Pass</span></button>
     <button id="skip">Skip</button>
   </div>
   <div id="status" role="status" aria-live="polite">connecting…</div>
   <div id="answer"></div>
-  <footer><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</footer>
+  <div id="vsResult" aria-live="polite"></div>
+  <footer><span class="solo-only"><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</span><span class="vs-only">one shot each · <kbd>Ctrl ⏎</kbd> lock in · song ends = time's up</span></footer>
 </div>
 <script>
 const CONFIG = {
@@ -315,6 +358,15 @@ const state = {
   rounds: 0, points: 0, streak: 0,
   token: null, lastPoll: 0, userName: null,
   pos: null, trackDuration: 0,
+};
+
+// versus: two players on one device, one round per song
+const vs = {
+  on: false,
+  players: [{ name: "", points: 0, wins: 0 }, { name: "", points: 0, wins: 0 }],
+  next: 0,               // who guesses first on the next song (alternates)
+  turn: 0,
+  guesses: [null, null], // { marks: [artist, song, year], earned } once locked in
 };
 
 const $ = (id) => document.getElementById(id);
@@ -338,7 +390,8 @@ const els = {
   sPoints: $("sPoints"), sStreak: $("sStreak"), sRounds: $("sRounds"),
   stPoints: $("stPoints"), stStreak: $("stStreak"),
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
-  pipBtn: $("pipBtn"),
+  pipBtn: $("pipBtn"), vsBtn: $("vsBtn"), vsResult: $("vsResult"),
+  stP: [$("stP0"), $("stP1")], sP: [$("sP0"), $("sP1")], pName: [$("pName0"), $("pName1")], sWins: $("sWins"),
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"),
@@ -423,14 +476,16 @@ function updateScore() {
   els.sStreak.textContent = state.streak >= 3 ? "🔥" + state.streak : state.streak;
   els.sRounds.textContent = state.rounds;
   els.stStreak.classList.toggle("hot", state.streak >= 3);
+  vs.players.forEach((p, i) => { els.sP[i].textContent = p.points; });
+  els.sWins.textContent = vs.players[0].wins + "–" + vs.players[1].wins;
 }
 
-function popPoints(n) {
+function popPoints(n, statEl = els.stPoints) {
   if (reduceMotion.matches) return;
   const el = document.createElement("span");
   el.className = "plus"; el.textContent = "+" + n;
   el.addEventListener("animationend", () => el.remove());
-  els.stPoints.appendChild(el);
+  statEl.appendChild(el);
 }
 
 function burst() {
@@ -450,16 +505,23 @@ function burst() {
 }
 
 function newRound(track, key) {
+  const timedOut = vs.on ? vsTimeUp() : "";
   state.track = track; state.trackKey = key; state.revealed = false; state.choicesFailed = false;
   applyInputUI();
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   els.answer.style.display = "none"; els.answer.textContent = "";
   els.answer.classList.remove("pop");
+  els.vsResult.style.display = "none"; els.vsResult.classList.remove("pop");
   fields.forEach((f) => setVerdict(f, null));
   els.cover.classList.remove("flipped");
   els.stage.classList.add("live");
   setStatus("new track — guess!");
   if (!els.app.classList.contains("pick") && els.app.ownerDocument.hasFocus()) els.artist.focus();
+  if (vs.on) {
+    vs.guesses = [null, null];
+    vs.turn = vs.next; vs.next = 1 - vs.next;
+    vsTurnUI(timedOut);
+  } else setTurnHighlight(-1);
   setupChoices(track);
 }
 
@@ -471,6 +533,7 @@ function answerText() {
 function check() {
   if (!state.track || state.revealed) return;
   if (usingPick()) return;
+  if (vs.on) { vsLockTyped(); return; }
   const t = state.track;
   const aOk = fuzzyMatch(els.artist.value, t.artists);
   const sOk = fuzzyMatch(els.song.value, [t.song]);
@@ -527,6 +590,7 @@ function finish(msg, win) {
 
 function reveal() {
   if (!state.track || state.revealed) return;
+  if (vs.on) { vsLock(["bad", "bad", "bad"], "passed"); return; }
   state.rounds += 1; state.streak = 0;
   finish("revealed — 0 points");
 }
@@ -576,7 +640,7 @@ function setupChoices(track) {
 function choicesFallback() {
   state.choicesFailed = true;
   applyInputUI();
-  setStatus("not enough to pick from — type it");
+  setStatus("not enough to pick from — type it" + (vs.on ? " · " + pname(vs.turn) + "'s turn" : ""));
   if (els.app.ownerDocument.hasFocus()) els.artist.focus();
 }
 
@@ -685,6 +749,17 @@ function pickOption(opt, btn) {
   if (!c.opts || state.revealed || c.results.length !== c.stage) return;
   const ok = c.accepted[c.stage].includes(opt);
   c.results.push(ok);
+  if (vs.on) {
+    btn.classList.add("pick-sel");
+    for (const b of els.choiceList.children) b.disabled = true;
+    const stage = ++c.stage;
+    setTimeout(() => {
+      if (state.choice !== c || state.revealed || c.stage !== stage) return;
+      if (stage < 3) renderStage();
+      else vsLock(c.results.map((r) => (r ? "ok" : "bad")));
+    }, reduceMotion.matches ? 150 : 300);
+    return;
+  }
   btn.classList.add(ok ? "pick-ok" : "pick-bad");
   const answer = c.accepted[c.stage][0];
   for (const b of els.choiceList.children) {
@@ -714,6 +789,122 @@ function finishPick() {
     finish(`${right}/3 right — next one's yours`);
   }
   els.choiceLabel.textContent = "next track inbound…";
+}
+
+function pname(i) {
+  return vs.players[i].name.trim() || "Player " + (i + 1);
+}
+
+function markPoints(marks) {
+  return (marks[0] === "ok") + (marks[1] === "ok") + (marks[2] === "ok" ? 2 : marks[2] === "close" ? 1 : 0);
+}
+
+function setTurnHighlight(i) {
+  els.stP.forEach((el, j) => el.classList.toggle("turn", j === i));
+}
+
+function setVersus(on) {
+  vs.on = on;
+  vs.players.forEach((p) => { p.points = 0; p.wins = 0; });
+  vs.next = 0;
+  els.app.classList.toggle("vs", on);
+  els.vsBtn.setAttribute("aria-pressed", String(on));
+  updateScore();
+  // replay the current song under the new rules, unless its answer is already out
+  if (state.track && !state.revealed) { const t = state.track; state.track = null; newRound(t, state.trackKey); return; }
+  setTurnHighlight(-1);
+  setStatus(on ? "versus on — first song up next" : "solo mode");
+}
+
+// clear the board for whoever guesses now; the other player shouldn't see anything
+function vsTurnUI(prefix) {
+  els.artist.value = ""; els.song.value = ""; els.year.value = "";
+  fields.forEach((f) => setVerdict(f, null));
+  setTurnHighlight(vs.turn);
+  setStatus((prefix ? prefix + " · " : "") + pname(vs.turn) + "'s turn — " + pname(1 - vs.turn) + ", eyes off");
+  const c = state.choice;
+  if (usingPick() && c.opts) { c.stage = 0; c.results = []; renderStage(); }
+  else if (!usingPick() && els.app.ownerDocument.hasFocus()) els.artist.focus();
+}
+
+function vsLockTyped() {
+  const t = state.track;
+  if (!els.artist.value.trim() && !els.song.value.trim() && !els.year.value.trim()) {
+    setStatus("type something — or Pass");
+    return;
+  }
+  const yv = parseInt(els.year.value, 10);
+  const diff = isNaN(yv) ? Infinity : Math.abs(yv - t.third.answer);
+  vsLock([
+    fuzzyMatch(els.artist.value, t.artists) ? "ok" : "bad",
+    fuzzyMatch(els.song.value, [t.song]) ? "ok" : "bad",
+    diff === 0 ? "ok" : diff <= 2 ? "close" : "bad",
+  ]);
+}
+
+function vsLock(marks, verb = "locked in") {
+  const who = vs.turn, other = 1 - who;
+  vs.guesses[who] = { marks, earned: markPoints(marks) };
+  if (!vs.guesses[other]) { vs.turn = other; vsTurnUI(pname(who) + " " + verb); return; }
+  vsResolve();
+}
+
+// bank both players' points for this song; returns the winner's index, or -1 for a tie
+function vsScoreSong() {
+  const [a, b] = vs.guesses.map((g) => g.earned);
+  vs.players[0].points += a; vs.players[1].points += b;
+  const w = a > b ? 0 : b > a ? 1 : -1;
+  if (w >= 0) vs.players[w].wins += 1;
+  updateScore();
+  return w;
+}
+
+function vsResultText(w) {
+  const [a, b] = vs.guesses.map((g) => g.earned);
+  return w < 0 ? `dead heat ${a}–${b}` : `${pname(w)} takes it ${Math.max(a, b)}–${Math.min(a, b)}`;
+}
+
+function vsResolve() {
+  els.artist.value = ""; els.song.value = ""; els.year.value = "";
+  const w = vsScoreSong();
+  setTurnHighlight(-1);
+  finish(w < 0 ? vsResultText(w) : "far out — " + vsResultText(w), w >= 0);
+  renderVsResult(w);
+  vs.guesses.forEach((g, i) => { if (g.earned) popPoints(g.earned, els.stP[i]); });
+  if (w >= 0) burst();
+  if (usingPick()) els.choiceLabel.textContent = "next track inbound…";
+}
+
+// the song changed before both locked in: whoever didn't scores 0
+function vsTimeUp() {
+  if (!state.track || state.revealed || !vs.guesses.some(Boolean)) return "";
+  vs.guesses = vs.guesses.map((g) => g || { marks: ["bad", "bad", "bad"], earned: 0 });
+  return "time's up, " + vsResultText(vsScoreSong());
+}
+
+function renderVsResult(w) {
+  const rows = vs.guesses.map((g, i) => {
+    const row = document.createElement("div");
+    row.className = "vsrow" + (i === w ? " won" : "");
+    const name = document.createElement("span");
+    name.textContent = (i === w ? "👑 " : "") + pname(i);
+    const chips = document.createElement("span");
+    chips.className = "chips";
+    ["artist", "song", "year"].forEach((label, k) => {
+      const c = document.createElement("i");
+      c.className = "chip " + g.marks[k];
+      c.textContent = label[0].toUpperCase();
+      c.title = label;
+      chips.appendChild(c);
+    });
+    const pts = document.createElement("b");
+    pts.textContent = "+" + g.earned;
+    row.append(name, chips, pts);
+    return row;
+  });
+  els.vsResult.replaceChildren(...rows);
+  els.vsResult.style.display = "grid";
+  els.vsResult.classList.add("pop");
 }
 
 // progress bar ticker; interpolates from last known spotify position
@@ -875,7 +1066,9 @@ els.imodes.forEach((b) => {
 els.check.onclick = check;
 els.reveal.onclick = reveal;
 els.skip.onclick = () => {
-  if (!state.revealed && state.track) { state.rounds += 1; state.streak = 0; finish("skipped"); }
+  if (state.revealed || !state.track) return;
+  if (vs.on) { setTurnHighlight(-1); finish("skipped — no contest"); return; }
+  state.rounds += 1; state.streak = 0; finish("skipped");
 };
 [els.artist, els.song, els.year].forEach((input, i, all) => {
   input.addEventListener("keydown", (e) => {
@@ -918,6 +1111,19 @@ async function togglePip() {
   });
 }
 els.pipBtn.onclick = togglePip;
+els.vsBtn.onclick = () => setVersus(!vs.on);
+try {
+  const names = JSON.parse(localStorage.getItem("gtt_players") || "[]");
+  names.forEach((n, i) => { if (vs.players[i] && typeof n === "string") vs.players[i].name = n; });
+} catch {}
+els.pName.forEach((input, i) => {
+  input.value = vs.players[i].name;
+  input.addEventListener("input", () => {
+    vs.players[i].name = input.value;
+    try { localStorage.setItem("gtt_players", JSON.stringify(vs.players.map((p) => p.name))); } catch {}
+  });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+});
 
 startSpotify();
 </script>
