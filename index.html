@@ -215,7 +215,29 @@
     display: flex; align-items: center; justify-content: center; min-height: 2.25rem; border-radius: 999px;
     background: #1db954; color: #08130c; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-decoration: none;
   }
-  #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip { display: none; }
+  #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip, #app.guest #roomsBtn { display: none; }
+  #app.lobby #reconnect, #app.lobby #skip, #app.lobby #vsBtn { display: none; }
+  #pubBtn { width: 100%; min-height: 2.25rem; margin-top: 0.375rem; border-radius: 999px; font-size: 0.75rem; letter-spacing: 0.04em; }
+  #pubBtn[aria-pressed="true"] { background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  #pubHint { display: block; margin-top: 0.3125rem; }
+  #lobby {
+    display: none; flex-direction: column; gap: 0.375rem; padding: 0.5rem; border-radius: 0.875rem;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline);
+  }
+  #lobby.show { display: flex; }
+  .lobby-head { display: flex; align-items: center; gap: 0.375rem; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); }
+  .lobby-head span { flex: 1; padding-left: 0.25rem; }
+  .lobby-head button { min-height: 2rem; padding: 0 0.625rem; border-radius: 999px; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: none; }
+  #lobbyList { display: grid; gap: 0.3125rem; max-height: 12rem; overflow-y: auto; overscroll-behavior: contain; }
+  .room { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.5rem; padding: 0.375rem 0.375rem 0.375rem 0.625rem; border-radius: 0.625rem; background: var(--fill); }
+  .room div { min-width: 0; display: grid; line-height: 1.25; }
+  .room b, .room span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room b { font-size: 0.8125rem; color: var(--cream); }
+  .room span { font-size: 0.6875rem; font-weight: 600; color: var(--label2); }
+  .room button { min-height: 2.25rem; padding: 0 0.875rem; border-radius: 999px; font-size: 0.75rem; background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  .room button:disabled { opacity: 0.45; }
+  #lobbyNote { font-size: 0.6875rem; font-weight: 600; color: var(--label3); text-align: center; min-height: 0.875rem; }
+  #lobbyLogin { min-height: 2.25rem; border-radius: 999px; font-size: 0.75rem; }
   .plus {
     position: absolute; right: 0.5rem; top: -0.25rem; pointer-events: none;
     font-family: var(--groovy); font-size: 1rem; color: var(--ok);
@@ -368,11 +390,19 @@
     <button data-imode="pick" aria-pressed="false">Pick 5</button>
   </div>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
-  <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="netBtn">Play online</button></div>
+  <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="roomsBtn" aria-pressed="false" title="Public rooms — find a game to join">🌍 Find</button><button id="netBtn">Host</button></div>
   <div id="jam">
     <input id="jamLink" type="url" placeholder="Paste your Spotify Jam link so everyone hears it" aria-label="Spotify Jam link" autocomplete="off" />
     <a id="jamJoin" target="_blank" rel="noopener noreferrer"></a>
     <span id="jamHint"></span>
+    <button id="pubBtn" type="button" aria-pressed="false">🌍 List this room publicly</button>
+    <span id="pubHint"></span>
+  </div>
+  <div id="lobby" aria-live="polite">
+    <div class="lobby-head"><span>Public rooms</span><button id="lobbyRefresh" type="button">Refresh</button><button id="lobbyClose" type="button" aria-label="Close public rooms">✕</button></div>
+    <div id="lobbyList"></div>
+    <div id="lobbyNote"></div>
+    <button id="lobbyLogin" type="button" hidden>Log in with Spotify to host your own</button>
   </div>
   <div class="stage" id="stage">
     <div class="deck">
@@ -461,6 +491,12 @@ const net = {
   jam: "",           // the host's Spotify Jam invite, so guests can hear the music
 };
 
+// public rooms (see the lobby section at the bottom)
+const LOBBY_SLOTS = 16;
+const lobbyId = (i) => "gtt-lobby-v1-" + i;
+const pub = { on: false, peer: null, slot: -1 };
+const lobby = { open: false, peer: null, rooms: new Map(), scanning: false, error: "" };
+
 function storedNames() {
   try { const n = JSON.parse(localStorage.getItem("gtt_players") || "[]"); return Array.isArray(n) ? n : []; } catch { return []; }
 }
@@ -496,7 +532,9 @@ const els = {
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
-  jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"),
+  jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"), pubBtn: $("pubBtn"), pubHint: $("pubHint"),
+  roomsBtn: $("roomsBtn"), lobby: $("lobby"), lobbyList: $("lobbyList"), lobbyNote: $("lobbyNote"),
+  lobbyRefresh: $("lobbyRefresh"), lobbyClose: $("lobbyClose"), lobbyLogin: $("lobbyLogin"),
   net: $("net"), netLed: $("netLed"), netText: $("netText"), netInvite: $("netInvite"), netBtn: $("netBtn"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
@@ -1798,18 +1836,27 @@ function renderJam() {
   els.jamJoin.textContent = "🎧 Join " + (vs.players[0].name.trim() ? hostName + "'s" : "the host's") + " Spotify Jam";
   els.jamHint.hidden = !(guest && !net.jam);
   els.jamHint.textContent = "no Jam link yet — ask " + hostName + " to start a Spotify Jam so you hear the music";
+  els.pubBtn.hidden = !host;
+  els.pubBtn.disabled = !(net.peer && net.peer.open);
+  els.pubBtn.setAttribute("aria-pressed", String(pub.on));
+  els.pubBtn.textContent = pub.on ? (pub.slot >= 0 ? "🌍 Public — anyone can find this room" : "🌍 Listing…") : "🌍 List this room publicly";
+  els.pubHint.hidden = !(host && pub.on && pub.slot >= 0);
+  els.pubHint.textContent = net.jam ? "heads up: strangers can join your Jam too — check who can add songs in its settings"
+    : "listed — add a Jam link above, or the people who join won't hear the music";
 }
 
 function renderNet() {
   const host = net.role === "host", guest = net.role === "guest", linked = netLinked();
   const open = host && net.peer && net.peer.open, friends = netGuests();
-  els.netBtn.textContent = guest ? "Leave" : host ? "Stop" : "Play online";
+  els.netBtn.textContent = guest ? "Leave" : host ? "Stop" : "Host";
+  els.netBtn.title = net.role ? "" : "Host an online room — up to " + MAX_PLAYERS + " players";
+  els.roomsBtn.hidden = !!net.role;
   els.netInvite.hidden = !open;
   els.netLed.className = "led " + (linked ? "on" : net.role ? "wait" : "");
   els.netText.textContent =
     guest ? (linked ? "online · " + pname(0) + "'s room" + (vs.players.length > 2 ? " · " + vs.players.filter((p, i) => present(i)).length + " here" : "") : "joining room " + net.code + "…")
     : host ? (!open ? "opening a room…" : "room " + net.code + " · " + (friends ? friends + (friends === 1 ? " friend" : " friends") + " in" : "invite the Jam"))
-    : "same device — or";
+    : "same device — or online";
   renderPlayers();
   renderJam();
 }
@@ -1853,6 +1900,7 @@ async function startHosting() {
 
 function stopHosting(quiet) {
   if (net.role !== "host") return;
+  setPublic(false);
   netSend({ t: "bye" });
   const peer = net.peer;
   Object.assign(net, { role: null, peer: null, conns: [], seatOf: new Map(), code: null, lastResult: null, jam: "" });
@@ -2132,10 +2180,179 @@ els.netInvite.onclick = async () => {
   }
 };
 
+// ---------- public rooms: a serverless lobby on well-known PeerJS ids ----------
+// a public room also claims one of LOBBY_SLOTS lobby ids and answers anyone who knocks with
+// what's on; the room browser knocks on every slot and lists whoever answers
+
+function setPublic(on) {
+  pub.on = on && net.role === "host";
+  if (pub.on) claimSlot(0, Math.floor(Math.random() * LOBBY_SLOTS)); else dropSlot();
+  renderJam();
+}
+
+function dropSlot() {
+  if (pub.peer) pub.peer.destroy();
+  pub.peer = null; pub.slot = -1;
+}
+
+// try slots from a random start so two hosts don't fight over slot 0
+function claimSlot(tries, start) {
+  dropSlot();
+  if (!pub.on || net.role !== "host") return;
+  if (tries >= LOBBY_SLOTS) {
+    pub.on = false; renderJam();
+    setStatus("the public lobby is full — share the invite link instead");
+    return;
+  }
+  const slot = (start + tries) % LOBBY_SLOTS;
+  const peer = new Peer(lobbyId(slot), peerOptions());
+  pub.peer = peer;
+  peer.on("open", () => {
+    if (pub.peer !== peer) return;
+    pub.slot = slot; renderJam();
+    console.log("[gtt] listed publicly in slot", slot);
+    setStatus("room listed — anyone can find it under VS → 🌍 Find");
+  });
+  // a message sent the instant a channel opens can get lost, so the browser keeps asking until it hears back
+  peer.on("connection", (conn) => {
+    conn.on("open", () => { sendTo(conn, roomInfo()); setTimeout(() => conn.close(), 4000); });
+    conn.on("data", (m) => { if (m && m.t === "who") sendTo(conn, roomInfo()); });
+  });
+  peer.on("disconnected", () => { if (pub.peer === peer && !peer.destroyed) peer.reconnect(); });
+  peer.on("error", (e) => {
+    if (pub.peer !== peer) return;
+    if (e.type === "unavailable-id") { claimSlot(tries + 1, start); return; }
+    console.error("[gtt] lobby error", e.type, e);
+    if (e.type === "network" || e.type === "server-error" || e.type === "socket-error" || e.type === "browser-incompatible") {
+      pub.on = false; dropSlot(); renderJam();
+      setStatus("couldn't list the room (" + e.type + ")");
+    }
+  });
+}
+
+function roomInfo() {
+  return {
+    t: "room", v: 1, code: net.code, name: pname(0), imode: state.imode, jam: net.jam,
+    players: vs.players.filter((p, i) => present(i)).length, full: vs.players.length >= MAX_PLAYERS,
+  };
+}
+
+function cleanRoom(m) {
+  if (!m || typeof m !== "object" || m.t !== "room") return null;
+  const code = str(m.code, 8).toUpperCase();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) return null;
+  return {
+    code, name: str(m.name, 12).trim() || "someone", jam: jamUrl(m.jam), imode: m.imode === "pick" ? "pick" : "type",
+    players: Math.max(1, Math.min(MAX_PLAYERS, Math.floor(Number(m.players)) || 1)), full: !!m.full,
+  };
+}
+
+async function scanRooms() {
+  if (lobby.scanning) return;
+  lobby.rooms.clear(); lobby.error = ""; lobby.scanning = true;
+  renderLobby();
+  try { await loadPeerJs(); } catch (e) { lobby.scanning = false; lobby.error = "can't look for rooms — " + e.message; renderLobby(); return; }
+  const peer = new Peer(undefined, peerOptions());
+  lobby.peer = peer;
+  const pending = new Set();
+  let timer = 0;
+  const done = () => {
+    if (lobby.peer !== peer) return;
+    clearTimeout(timer);
+    lobby.peer = null; lobby.scanning = false;
+    setTimeout(() => peer.destroy(), 500);
+    renderLobby();
+  };
+  const settle = (i) => { pending.delete(i); if (!pending.size) done(); };
+  peer.on("open", () => {
+    for (let i = 0; i < LOBBY_SLOTS; i++) {
+      pending.add(i);
+      const conn = peer.connect(lobbyId(i), { reliable: true });
+      let ask = 0;
+      conn.on("open", () => {
+        const who = () => { if (conn.open && pending.has(i)) { sendTo(conn, { t: "who" }); ask = setTimeout(who, 600); } };
+        who();
+      });
+      conn.on("data", (m) => {
+        const room = cleanRoom(m);
+        if (!room) return;
+        clearTimeout(ask);
+        if (lobby.peer === peer) { lobby.rooms.set(room.code, room); renderLobby(); }
+        settle(i); conn.close();
+      });
+      conn.on("close", () => { clearTimeout(ask); settle(i); });
+    }
+    // empty slots report back once the PeerJS server gives up on them (~5s); this catches a slot whose WebRTC never connects
+    timer = setTimeout(done, 8000);
+  });
+  peer.on("error", (e) => {
+    const m = /gtt-lobby-v1-(\d+)/.exec(e.message || "");
+    if (e.type === "peer-unavailable") { if (m) settle(Number(m[1])); return; } // empty slot
+    console.error("[gtt] lobby scan error", e.type, e);
+    lobby.error = "couldn't reach the lobby (" + e.type + ")";
+    done();
+  });
+}
+
+function joinUrl(code, jam) {
+  return location.pathname + "?join=" + code + (jam ? "&jam=" + encodeURIComponent(jam) : "");
+}
+
+function renderLobby() {
+  els.lobby.classList.toggle("show", lobby.open);
+  els.roomsBtn.setAttribute("aria-pressed", String(lobby.open));
+  if (!lobby.open) return;
+  els.lobbyRefresh.disabled = lobby.scanning;
+  els.lobbyLogin.hidden = state.mode !== "lobby";
+  els.lobbyClose.hidden = state.mode === "lobby"; // nothing else to do here without Spotify
+  const rooms = [...lobby.rooms.values()].sort((a, b) => b.players - a.players);
+  els.lobbyList.replaceChildren(...rooms.map((r) => {
+    const row = document.createElement("div");
+    row.className = "room";
+    const txt = document.createElement("div");
+    const name = document.createElement("b");
+    name.textContent = r.name + "'s room";
+    const meta = document.createElement("span");
+    meta.textContent = r.players + (r.players === 1 ? " player" : " playing") + " · " + (r.imode === "pick" ? "Pick 5" : "Type")
+      + " · " + (r.jam ? "🎧 Jam" : "no Jam yet");
+    txt.append(name, meta);
+    const b = document.createElement("button");
+    b.type = "button";
+    const mine = net.role === "host" && r.code === net.code;
+    b.textContent = mine ? "Yours" : r.full ? "Full" : "Join";
+    b.disabled = mine || r.full;
+    b.onclick = () => { if (net.peer) net.peer.destroy(); location.href = joinUrl(r.code, r.jam); };
+    row.append(txt, b);
+    return row;
+  }));
+  els.lobbyNote.textContent = lobby.scanning ? "looking for rooms…" : lobby.error
+    || (rooms.length ? "" : "no public rooms right now — host one: VS → Host → 🌍");
+  els.lobbyNote.hidden = !els.lobbyNote.textContent;
+}
+
+function setLobbyOpen(open) {
+  lobby.open = open;
+  renderLobby();
+  if (open) scanRooms();
+}
+
+els.pubBtn.onclick = () => setPublic(!pub.on);
+els.roomsBtn.onclick = () => setLobbyOpen(!lobby.open);
+els.lobbyRefresh.onclick = scanRooms;
+els.lobbyClose.onclick = () => setLobbyOpen(false);
+els.lobbyLogin.onclick = () => { location.href = location.pathname; };
+
 const params = new URL(location.href).searchParams;
 const joinCode = params.get("join");
 if (joinCode) startGuest(joinCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8), params.get("jam"));
-else startSpotify();
+else if (params.has("rooms")) {
+  // browse without logging in to Spotify: joining a room doesn't need it
+  state.mode = "lobby";
+  els.app.classList.add("lobby");
+  setConn("off", "not logged in — joining doesn't need Spotify");
+  setStatus("pick a room to join");
+  setLobbyOpen(true);
+} else startSpotify();
 renderNet();
 </script>
 </body>
