@@ -191,6 +191,11 @@
   .stat.turn .pname, .stat.turn .pname::placeholder { color: var(--mustard); }
   .stat.locked { border-color: var(--ok); }
   .pname:read-only { cursor: default; }
+  .stat.me .pname, .stat.me .pname::placeholder { color: var(--cream); }
+  .stat.away { opacity: 0.45; }
+  #vsScore.many { max-height: 7.5rem; overflow-y: auto; align-content: start; gap: 0.25rem; overscroll-behavior: contain; scrollbar-width: thin; }
+  #vsScore.many .stat { padding: 0.25rem 0.625rem; }
+  #vsScore.many .stat b { font-size: 0.9375rem; }
   #net { display: none; align-items: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2); }
   #app.vs #net { display: flex; }
   #netText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -210,7 +215,29 @@
     display: flex; align-items: center; justify-content: center; min-height: 2.25rem; border-radius: 999px;
     background: #1db954; color: #08130c; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-decoration: none;
   }
-  #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip { display: none; }
+  #app.guest #vsBtn, #app.guest #reconnect, #app.guest #skip, #app.guest #roomsBtn { display: none; }
+  #app.lobby #reconnect, #app.lobby #skip, #app.lobby #vsBtn { display: none; }
+  #pubBtn { width: 100%; min-height: 2.25rem; margin-top: 0.375rem; border-radius: 999px; font-size: 0.75rem; letter-spacing: 0.04em; }
+  #pubBtn[aria-pressed="true"] { background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  #pubHint { display: block; margin-top: 0.3125rem; }
+  #lobby {
+    display: none; flex-direction: column; gap: 0.375rem; padding: 0.5rem; border-radius: 0.875rem;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline);
+  }
+  #lobby.show { display: flex; }
+  .lobby-head { display: flex; align-items: center; gap: 0.375rem; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); }
+  .lobby-head span { flex: 1; padding-left: 0.25rem; }
+  .lobby-head button { min-height: 2rem; padding: 0 0.625rem; border-radius: 999px; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: none; }
+  #lobbyList { display: grid; gap: 0.3125rem; max-height: 12rem; overflow-y: auto; overscroll-behavior: contain; }
+  .room { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.5rem; padding: 0.375rem 0.375rem 0.375rem 0.625rem; border-radius: 0.625rem; background: var(--fill); }
+  .room div { min-width: 0; display: grid; line-height: 1.25; }
+  .room b, .room span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room b { font-size: 0.8125rem; color: var(--cream); }
+  .room span { font-size: 0.6875rem; font-weight: 600; color: var(--label2); }
+  .room button { min-height: 2.25rem; padding: 0 0.875rem; border-radius: 999px; font-size: 0.75rem; background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  .room button:disabled { opacity: 0.45; }
+  #lobbyNote { font-size: 0.6875rem; font-weight: 600; color: var(--label3); text-align: center; min-height: 0.875rem; }
+  #lobbyLogin { min-height: 2.25rem; border-radius: 999px; font-size: 0.75rem; }
   .plus {
     position: absolute; right: 0.5rem; top: -0.25rem; pointer-events: none;
     font-family: var(--groovy); font-size: 1rem; color: var(--ok);
@@ -329,6 +356,7 @@
   .vsrow span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vsrow b { font-family: var(--groovy); font-weight: 400; text-align: right; }
   .vsrow.won { color: var(--mustard); }
+  .vsrow.me span:first-child { color: var(--cream); }
   .chips { display: flex; gap: 0.25rem; }
   .chip { width: 1.25rem; height: 1.25rem; border-radius: 0.375rem; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 0.625rem; font-weight: 800; color: var(--ink); }
   .chip.ok { background: var(--ok); }
@@ -353,7 +381,7 @@
     <h1>Guess the Track</h1>
     <div class="hbtns">
       <button id="lyrBtn" aria-pressed="false" title="Lyrics (looked up on lrclib.net)" aria-label="Lyrics">🎤</button>
-      <button id="vsBtn" aria-pressed="false" title="Two-player versus" aria-label="Two-player versus">VS</button>
+      <button id="vsBtn" aria-pressed="false" title="Versus — same device, or online with your whole Jam" aria-label="Versus">VS</button>
       <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
     </div>
   </header>
@@ -362,11 +390,19 @@
     <button data-imode="pick" aria-pressed="false">Pick 5</button>
   </div>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
-  <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="netBtn">Play online</button></div>
+  <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="roomsBtn" aria-pressed="false" title="Public rooms — find a game to join">🌍 Find</button><button id="netBtn">Host</button></div>
   <div id="jam">
-    <input id="jamLink" type="url" placeholder="Paste your Spotify Jam link so they hear it" aria-label="Spotify Jam link" autocomplete="off" />
+    <input id="jamLink" type="url" placeholder="Paste your Spotify Jam link so everyone hears it" aria-label="Spotify Jam link" autocomplete="off" />
     <a id="jamJoin" target="_blank" rel="noopener noreferrer"></a>
     <span id="jamHint"></span>
+    <button id="pubBtn" type="button" aria-pressed="false">🌍 List this room publicly</button>
+    <span id="pubHint"></span>
+  </div>
+  <div id="lobby" aria-live="polite">
+    <div class="lobby-head"><span>Public rooms</span><button id="lobbyRefresh" type="button">Refresh</button><button id="lobbyClose" type="button" aria-label="Close public rooms">✕</button></div>
+    <div id="lobbyList"></div>
+    <div id="lobbyNote"></div>
+    <button id="lobbyLogin" type="button" hidden>Log in with Spotify to host your own</button>
   </div>
   <div class="stage" id="stage">
     <div class="deck">
@@ -384,9 +420,7 @@
       <div class="stat"><span>Rounds</span><b id="sRounds">0</b></div>
     </div>
     <div class="stats" id="vsScore">
-      <div class="stat" id="stP0"><input class="pname" id="pName0" placeholder="Player 1" maxlength="12" aria-label="Player 1 name" autocomplete="off" /><b id="sP0">0</b></div>
-      <div class="stat" id="stP1"><input class="pname" id="pName1" placeholder="Player 2" maxlength="12" aria-label="Player 2 name" autocomplete="off" /><b id="sP1">0</b></div>
-      <div class="stat"><span>Songs</span><b id="sWins">0–0</b></div>
+      <div class="stat" id="stSongs"><span>Songs</span><b id="sWins">0–0</b></div>
     </div>
   </div>
   <div class="prog"><span id="tNow">0:00</span><div class="bar"><div id="progress"></div></div><span id="tTotal">0:00</span></div>
@@ -432,25 +466,45 @@ const state = {
   hint: null,                  // the lyric hint bought for this song
 };
 
-// versus: two players on one device, one round per song
+// versus: two players taking turns on one device, or a whole room online; one round per song
 const vs = {
   on: false,
-  players: [{ name: "", points: 0, wins: 0 }, { name: "", points: 0, wins: 0 }],
-  next: 0,               // who guesses first on the next song (alternates)
+  players: localPlayers(), // { name, points, wins, away } — index = seat
+  next: 0,                 // same device: who guesses first on the next song (alternates)
   turn: 0,
-  guesses: [null, null], // { marks: [artist, song, year], earned } once locked in
+  guesses: [],             // by seat: { marks: [artist, song, year], earned } once locked in
 };
 
-// online versus: the host (Spotify logged in) is player 0 and grades everything;
-// the guest (player 1) never sees the answer before the round resolves
+// online versus: the host (Spotify logged in) is seat 0 and grades everything; guests
+// (seat 1 and up, one per person in the Jam) never see the answer before the round resolves
+const MAX_PLAYERS = 32; // a Spotify Jam holds 32 people
 const net = {
-  role: null,       // null | "host" | "guest"
-  peer: null, conn: null, code: null,
-  guestId: null,    // host: device id of the seated guest, so a reload takes the seat back
-  myLocked: false,  // guest: locked in this round
-  lastResult: null, // host: last result message, resent to a guest who rejoins
-  jam: "",          // the host's Spotify Jam invite, so the guest can hear the music
+  role: null,        // null | "host" | "guest"
+  peer: null, code: null,
+  conn: null,        // guest: the link to the host
+  conns: [],         // host: guest links by seat (seat 0, the host, is always null)
+  seatOf: new Map(), // host: device id -> seat, so a reload takes the seat back
+  seat: null,        // guest: my seat, once the host says hello
+  myName: "",        // guest: my name — mine to type, the host only echoes it
+  myLocked: false,   // guest: locked in this round
+  lastResult: null,  // host: last result message, resent to a guest who rejoins
+  jam: "",           // the host's Spotify Jam invite, so guests can hear the music
 };
+
+// public rooms (see the lobby section at the bottom)
+const LOBBY_SLOTS = 16;
+const lobbyId = (i) => "gtt-lobby-v1-" + i;
+const pub = { on: false, peer: null, slot: -1 };
+const lobby = { open: false, peer: null, rooms: new Map(), scanning: false, error: "" };
+
+function storedNames() {
+  try { const n = JSON.parse(localStorage.getItem("gtt_players") || "[]"); return Array.isArray(n) ? n : []; } catch { return []; }
+}
+
+function localPlayers() {
+  const names = storedNames();
+  return [0, 1].map((i) => ({ name: typeof names[i] === "string" ? names[i] : "", points: 0, wins: 0 }));
+}
 
 const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -474,11 +528,13 @@ const els = {
   stPoints: $("stPoints"), stStreak: $("stStreak"),
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
   pipBtn: $("pipBtn"), vsBtn: $("vsBtn"), vsResult: $("vsResult"), lyrBtn: $("lyrBtn"), lyrics: $("lyrics"),
-  stP: [$("stP0"), $("stP1")], sP: [$("sP0"), $("sP1")], pName: [$("pName0"), $("pName1")], sWins: $("sWins"),
+  vsScore: $("vsScore"), songsRow: $("stSongs"), sWins: $("sWins"), rows: [], // rows: { stat, name, pts } by seat
   imodes: document.querySelectorAll("[data-imode]"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
-  jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"),
+  jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"), pubBtn: $("pubBtn"), pubHint: $("pubHint"),
+  roomsBtn: $("roomsBtn"), lobby: $("lobby"), lobbyList: $("lobbyList"), lobbyNote: $("lobbyNote"),
+  lobbyRefresh: $("lobbyRefresh"), lobbyClose: $("lobbyClose"), lobbyLogin: $("lobbyLogin"),
   net: $("net"), netLed: $("netLed"), netText: $("netText"), netInvite: $("netInvite"), netBtn: $("netBtn"),
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
@@ -561,8 +617,59 @@ function updateScore() {
   els.sStreak.textContent = state.streak >= 3 ? "🔥" + state.streak : state.streak;
   els.sRounds.textContent = state.rounds;
   els.stStreak.classList.toggle("hot", state.streak >= 3);
-  vs.players.forEach((p, i) => { els.sP[i].textContent = p.points; });
-  els.sWins.textContent = vs.players[0].wins + "–" + vs.players[1].wins;
+  renderPlayers();
+}
+
+// versus scoreboard, one row per seat; rows are reused so a name being typed keeps focus
+function renderPlayers() {
+  const n = vs.players.length;
+  while (els.rows.length < n) els.rows.push(makePlayerRow(els.rows.length));
+  while (els.rows.length > n) els.rows.pop().stat.remove();
+  els.rows.forEach((r, i) => {
+    const p = vs.players[i];
+    r.name.readOnly = !(net.role ? i === myIndex() : true);
+    if (r.name.value !== p.name && r.name.ownerDocument.activeElement !== r.name) r.name.value = p.name;
+    r.pts.textContent = p.points;
+    r.stat.classList.toggle("away", !!p.away);
+    r.stat.classList.toggle("me", !!net.role && i === myIndex());
+  });
+  // head to head keeps the songs tally; a bigger room just ranks by points
+  if (n === 2) { els.sWins.textContent = vs.players[0].wins + "–" + vs.players[1].wins; els.vsScore.append(els.songsRow); }
+  else els.songsRow.remove();
+  els.vsScore.classList.toggle("many", n > 3);
+}
+
+function makePlayerRow(i) {
+  const stat = document.createElement("div");
+  stat.className = "stat";
+  const name = document.createElement("input");
+  name.className = "pname"; name.maxLength = 12; name.autocomplete = "off";
+  name.placeholder = "Player " + (i + 1);
+  name.setAttribute("aria-label", "Player " + (i + 1) + " name");
+  name.addEventListener("input", () => { if (!name.readOnly) setName(i, name.value); });
+  name.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); name.blur(); } });
+  const pts = document.createElement("b");
+  stat.append(name, pts);
+  els.vsScore.append(stat);
+  return { stat, name, pts };
+}
+
+function setName(i, name) {
+  vs.players[i].name = name;
+  // a guest's own name lives in slot 1, where it's always been
+  const slot = net.role === "guest" ? 1 : i;
+  try {
+    const names = storedNames();
+    names[slot] = name;
+    localStorage.setItem("gtt_players", JSON.stringify(names));
+  } catch {}
+  if (net.role === "guest") { net.myName = name; netSend({ t: "name", name }); }
+  else if (net.role === "host") netSend({ t: "players", players: vs.players });
+  renderJam();
+}
+
+function statOf(i) {
+  return els.rows[i] ? els.rows[i].stat : els.stPoints;
 }
 
 function popPoints(n, statEl = els.stPoints) {
@@ -667,8 +774,8 @@ function newRound(track, key, carry = "") {
   setStatus("new track — guess!");
   if (!els.app.classList.contains("pick") && els.app.ownerDocument.hasFocus()) els.artist.focus();
   if (vs.on) {
-    vs.guesses = [null, null]; net.myLocked = false;
-    els.stP.forEach((el) => el.classList.remove("locked"));
+    vs.guesses = []; net.myLocked = false;
+    els.rows.forEach((r) => r.stat.classList.remove("locked"));
     if (net.role) vsOnlineUI(timedOut);
     else { vs.turn = vs.next; vs.next = 1 - vs.next; vsTurnUI(timedOut); }
   } else setTurnHighlight(-1);
@@ -710,7 +817,7 @@ function renderFasit() {
     meta.textContent = f.artists.join(", ") + " · " + f.year;
     txt.append(song, meta);
     const pts = document.createElement("span");
-    pts.className = "fasit-pts" + (f.note.startsWith("+") ? " won" : "");
+    pts.className = "fasit-pts" + (/\+[1-9]/.test(f.note) ? " won" : "");
     pts.textContent = f.note;
     row.append(art, txt, pts);
     return row;
@@ -756,7 +863,7 @@ function check() {
   if (firstBad) firstBad.querySelector("input").focus();
 }
 
-// note: what this song scored, shown in the answer key ("+3", "skipped", "2–1" in versus)
+// note: what this song scored, shown in the answer key ("+3", "skipped", "2–1" head to head)
 function finish(msg, win, note) {
   state.revealed = true;
   setStatus(msg, win);
@@ -786,7 +893,7 @@ function reveal() {
   if (vs.on) {
     if (vsMeLocked()) return;
     if (net.role === "guest") guestLock({ kind: "pass" });
-    else vsLock(["bad", "bad", "bad"], "passed");
+    else vsLock(BAD3, "passed");
     return;
   }
   state.rounds += 1; state.streak = 0;
@@ -1004,7 +1111,7 @@ function finishPick() {
 }
 
 function pname(i) {
-  return vs.players[i].name.trim() || "Player " + (i + 1);
+  return (vs.players[i] && vs.players[i].name.trim()) || "Player " + (i + 1);
 }
 
 const STAGE_POINTS = [1, 1, 2]; // artist, song, year
@@ -1014,16 +1121,36 @@ function markPoints(marks) {
 }
 
 function setTurnHighlight(i) {
-  els.stP.forEach((el, j) => el.classList.toggle("turn", j === i));
+  els.rows.forEach((r, j) => r.stat.classList.toggle("turn", j === i));
 }
 
+// online: this device's seat
 function myIndex() {
-  return net.role === "guest" ? 1 : 0;
+  return net.role === "guest" ? (net.seat ?? -1) : 0;
 }
 
 // online: has this device's player already locked in this round?
 function vsMeLocked() {
   return net.role === "guest" ? net.myLocked : net.role === "host" ? !!vs.guesses[0] : false;
+}
+
+// still in the room (online, a guest who left keeps their seat and points but isn't waited for)
+function present(i) {
+  return !!vs.players[i] && !vs.players[i].away;
+}
+
+// seats that guessed this song
+function vsEntrants() {
+  return vs.players.map((_, i) => i).filter((i) => vs.guesses[i]);
+}
+
+// seats still to lock in
+function vsWaitingOn() {
+  return vs.players.map((_, i) => i).filter((i) => present(i) && !vs.guesses[i]);
+}
+
+function nameList(seats) {
+  return seats.length <= 2 ? seats.map(pname).join(" & ") : seats.length + " players";
 }
 
 // restart the current song under new rules, unless its answer is already out
@@ -1036,7 +1163,8 @@ function replayRound() {
 function setVersus(on) {
   if (!on && net.role === "host") stopHosting(true);
   vs.on = on;
-  vs.players.forEach((p) => { p.points = 0; p.wins = 0; });
+  vs.players = localPlayers();
+  vs.guesses = [];
   vs.next = 0;
   els.app.classList.toggle("vs", on);
   els.vsBtn.setAttribute("aria-pressed", String(on));
@@ -1058,13 +1186,15 @@ function vsTurnUI(prefix) {
   else if (!usingPick() && els.app.ownerDocument.hasFocus()) els.artist.focus();
 }
 
-// online: no turns, both players guess at the same time
+// online: no turns, everyone guesses at the same time
 function vsOnlineUI(prefix) {
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   fields.forEach((f) => setVerdict(f, null));
   setTurnHighlight(-1);
-  const waiting = net.role === "host" && !netLinked();
-  setStatus((prefix ? prefix + " · " : "") + (waiting ? "waiting for a friend to join" : "go — you're both guessing"));
+  const here = vs.players.filter((p, i) => present(i)).length;
+  const go = net.role === "host" && here < 2 ? "waiting for friends — invite your Jam"
+    : here === 2 ? "go — you're both guessing" : "go — everyone's guessing";
+  setStatus((prefix ? prefix + " · " : "") + go);
   if (!usingPick() && els.app.ownerDocument.hasFocus()) els.artist.focus();
 }
 
@@ -1090,42 +1220,75 @@ function vsLockTyped() {
   else vsLock(gradeTyped(a, s, y));
 }
 
-function vsLock(marks, verb = "locked in", who = net.role ? 0 : vs.turn) {
-  const other = 1 - who;
+function vsLock(marks, verb = "locked in", who = net.role ? myIndex() : vs.turn) {
   vs.guesses[who] = { marks, earned: markPoints(marks) };
-  els.stP[who].classList.add("locked");
-  if (vs.guesses[other]) { vsResolve(); return; }
+  statOf(who).classList.add("locked");
+  if (!vsWaitingOn().length) { vsResolve(); return; }
   if (net.role) {
-    if (who === 0) netSend({ t: "locked", who, verb });
+    netSend({ t: "locked", key: state.trackKey, who, verb });
     showLocked(who, verb);
     return;
   }
-  vs.turn = other; vsTurnUI(pname(who) + " " + verb);
+  vs.turn = 1 - who; vsTurnUI(pname(who) + " " + verb);
 }
 
-// online: one side is in, the other is still guessing
+// host: someone left mid-song — if they were the last one we waited on, settle it
+function vsMaybeResolve() {
+  if (vs.on && state.track && !state.revealed && vsEntrants().length && !vsWaitingOn().length) vsResolve();
+}
+
+// online: someone's in, others are still guessing
 function showLocked(who, verb) {
-  els.stP[who].classList.add("locked");
+  vs.guesses[who] ||= { marks: null, earned: 0 }; // guests only learn that a seat is in, not what it guessed
+  statOf(who).classList.add("locked");
+  const left = vsWaitingOn();
+  const waiting = left.length ? " — waiting for " + nameList(left) : "";
   if (who === myIndex()) {
     fields.forEach((f) => { f.querySelector("input").readOnly = true; });
     if (usingPick()) { els.choiceList.replaceChildren(); els.choiceLabel.textContent = verb; }
-    setStatus(verb + " — waiting for " + pname(1 - who));
+    setStatus(verb + waiting);
   } else if (!vsMeLocked()) setStatus(pname(who) + " " + verb + " — your move");
+  else setStatus(pname(who) + " " + verb + waiting);
 }
 
-// bank both players' points for this song; returns the winner's index, or -1 for a tie
+// bank everyone's points for this song; returns the winner's seat, or -1 for a tie / nobody scoring
 function vsScoreSong() {
-  const [a, b] = vs.guesses.map((g) => g.earned);
-  vs.players[0].points += a; vs.players[1].points += b;
-  const w = a > b ? 0 : b > a ? 1 : -1;
+  vsEntrants().forEach((i) => { vs.players[i].points += vs.guesses[i].earned; });
+  const w = vsWinner();
   if (w >= 0) vs.players[w].wins += 1;
   updateScore();
   return w;
 }
 
+function vsBest() {
+  return Math.max(0, ...vsEntrants().map((i) => vs.guesses[i].earned));
+}
+
+function vsWinner() {
+  const best = vsBest();
+  const top = vsEntrants().filter((i) => vs.guesses[i].earned === best);
+  return best > 0 && top.length === 1 ? top[0] : -1;
+}
+
 function vsResultText(w) {
-  const [a, b] = vs.guesses.map((g) => g.earned);
-  return w < 0 ? `dead heat ${a}–${b}` : `${pname(w)} takes it ${Math.max(a, b)}–${Math.min(a, b)}`;
+  const seats = vsEntrants(), pts = seats.map((i) => vs.guesses[i].earned), best = vsBest();
+  if (seats.length === 2) {
+    const [a, b] = pts;
+    return w < 0 ? `dead heat ${a}–${b}` : `${pname(w)} takes it ${Math.max(a, b)}–${Math.min(a, b)}`;
+  }
+  if (w >= 0) return seats.length === 1 ? `${pname(w)} scores ${best}` : `${pname(w)} takes it with ${best}`;
+  if (best === 0) return "nobody scored";
+  const top = seats.filter((i) => vs.guesses[i].earned === best);
+  return top.length > 3 ? `${top.length}-way tie at ${best}` : `dead heat at ${best} — ` + top.map(pname).join(", ");
+}
+
+// answer key note: the score line head to head, otherwise how this device did
+function vsNote(w) {
+  const seats = vsEntrants();
+  if (seats.length === 2) return seats.map((i) => vs.guesses[i].earned).join("–");
+  const me = vs.guesses[myIndex()];
+  if (!net.role || !me) return w >= 0 ? "👑 " + pname(w) : "tie";
+  return (w === myIndex() ? "👑 " : "") + (me.earned ? "+" + me.earned : "0");
 }
 
 function vsResolve() {
@@ -1135,7 +1298,7 @@ function vsResolve() {
   if (net.role === "host") {
     const t = state.track;
     net.lastResult = {
-      t: "result", key: state.trackKey, w, msg, guesses: vs.guesses, players: vs.players,
+      t: "result", key: state.trackKey, w, msg, guesses: vs.players.map((_, i) => vs.guesses[i] || null), players: vs.players,
       track: { artists: t.artists, song: t.song, third: t.third, artUrl: t.artUrl, album: t.album, duration: t.duration },
     };
     netSend(net.lastResult);
@@ -1145,27 +1308,30 @@ function vsResolve() {
 
 function vsShowResult(w, msg) {
   setTurnHighlight(-1);
-  els.stP.forEach((el) => el.classList.remove("locked"));
-  finish(msg, w >= 0, vs.guesses.map((g) => g.earned).join("–"));
+  els.rows.forEach((r) => r.stat.classList.remove("locked"));
+  finish(msg, w >= 0, vsNote(w));
   renderVsResult(w);
-  vs.guesses.forEach((g, i) => { if (g.earned) popPoints(g.earned, els.stP[i]); });
+  vsEntrants().forEach((i) => { if (vs.guesses[i].earned) popPoints(vs.guesses[i].earned, statOf(i)); });
   if (w >= 0) burst();
   if (usingPick()) els.choiceLabel.textContent = "next track inbound…";
 }
 
-// the song changed before both locked in: whoever didn't scores 0
+// the song changed before everyone locked in: whoever's still here and didn't scores 0
 function vsTimeUp() {
-  if (!state.track || state.revealed || !vs.guesses.some(Boolean)) return "";
-  vs.guesses = vs.guesses.map((g) => g || { marks: ["bad", "bad", "bad"], earned: 0 });
+  if (!state.track || state.revealed || !vsEntrants().length) return "";
+  vsWaitingOn().forEach((i) => { vs.guesses[i] = { marks: BAD3, earned: 0 }; });
   return "time's up, " + vsResultText(vsScoreSong());
 }
 
 function renderVsResult(w) {
-  const rows = vs.guesses.map((g, i) => {
+  let seats = vsEntrants();
+  if (seats.length > 2) seats = seats.sort((a, b) => vs.guesses[b].earned - vs.guesses[a].earned);
+  const rows = seats.map((i) => {
+    const g = vs.guesses[i];
     const row = document.createElement("div");
-    row.className = "vsrow" + (i === w ? " won" : "");
+    row.className = "vsrow" + (i === w ? " won" : "") + (net.role && i === myIndex() ? " me" : "");
     const name = document.createElement("span");
-    name.textContent = (i === w ? "👑 " : "") + pname(i);
+    name.textContent = (i === w ? "👑 " : "") + pname(i) + (net.role && i === myIndex() && seats.length > 2 ? " (you)" : "");
     const chips = document.createElement("span");
     chips.className = "chips";
     ["artist", "song", "year"].forEach((label, k) => {
@@ -1451,23 +1617,6 @@ els.reconnect.onclick = async () => {
   await redirectToSpotify();
 };
 els.vsBtn.onclick = () => setVersus(!vs.on);
-try {
-  const names = JSON.parse(localStorage.getItem("gtt_players") || "[]");
-  names.forEach((n, i) => { if (vs.players[i] && typeof n === "string") vs.players[i].name = n; });
-} catch {}
-els.pName.forEach((input, i) => {
-  input.value = vs.players[i].name;
-  input.addEventListener("input", () => {
-    vs.players[i].name = input.value;
-    try {
-      const names = JSON.parse(localStorage.getItem("gtt_players") || "[]");
-      names[i] = input.value;
-      localStorage.setItem("gtt_players", JSON.stringify(names));
-    } catch {}
-    if (net.role) netSend({ t: "name", name: input.value });
-  });
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
-});
 
 // ---------- lyrics (opt-in, from lrclib.net): a hint while guessing, karaoke after the reveal
 let lyricsOn = false;
@@ -1639,18 +1788,30 @@ function loadPeerJs() {
 }
 const peerOptions = () => window.GTT_PEER_OPTIONS || {}; // override for a self-hosted PeerJS server
 
+// guests still connected (host), or the link to the host (guest)
+function netGuests() {
+  return net.conns.filter((c) => c && c.open).length;
+}
+
 function netLinked() {
-  return !!(net.conn && net.conn.open);
+  return net.role === "guest" ? !!(net.conn && net.conn.open) : netGuests() > 0;
 }
 
+function sendTo(conn, msg) {
+  if (conn && conn.open) conn.send(msg);
+}
+
+// guest: to the host · host: to every guest in the room
 function netSend(msg) {
-  if (netLinked()) net.conn.send(msg);
+  if (net.role === "guest") sendTo(net.conn, msg);
+  else if (net.role === "host") net.conns.forEach((c) => sendTo(c, msg));
 }
 
-function netSendPos() {
+function netSendPos(conn) {
   if (net.role !== "host" || !state.pos) return;
   const p = state.pos;
-  netSend({ t: "pos", pos: p.position_ms + (Date.now() - p.timestamp_ms) * p.speed, dur: state.trackDuration, playing: !!p.speed });
+  const msg = { t: "pos", pos: p.position_ms + (Date.now() - p.timestamp_ms) * p.speed, dur: state.trackDuration, playing: !!p.speed };
+  if (conn) sendTo(conn, msg); else netSend(msg);
 }
 
 function inviteUrl() {
@@ -1675,19 +1836,28 @@ function renderJam() {
   els.jamJoin.textContent = "🎧 Join " + (vs.players[0].name.trim() ? hostName + "'s" : "the host's") + " Spotify Jam";
   els.jamHint.hidden = !(guest && !net.jam);
   els.jamHint.textContent = "no Jam link yet — ask " + hostName + " to start a Spotify Jam so you hear the music";
+  els.pubBtn.hidden = !host;
+  els.pubBtn.disabled = !(net.peer && net.peer.open);
+  els.pubBtn.setAttribute("aria-pressed", String(pub.on));
+  els.pubBtn.textContent = pub.on ? (pub.slot >= 0 ? "🌍 Public — anyone can find this room" : "🌍 Listing…") : "🌍 List this room publicly";
+  els.pubHint.hidden = !(host && pub.on && pub.slot >= 0);
+  els.pubHint.textContent = net.jam ? "heads up: strangers can join your Jam too — check who can add songs in its settings"
+    : "listed — add a Jam link above, or the people who join won't hear the music";
 }
 
 function renderNet() {
   const host = net.role === "host", guest = net.role === "guest", linked = netLinked();
-  els.netBtn.textContent = guest ? "Leave" : host ? "Stop" : "Play online";
-  els.netInvite.hidden = !host || linked;
+  const open = host && net.peer && net.peer.open, friends = netGuests();
+  els.netBtn.textContent = guest ? "Leave" : host ? "Stop" : "Host";
+  els.netBtn.title = net.role ? "" : "Host an online room — up to " + MAX_PLAYERS + " players";
+  els.roomsBtn.hidden = !!net.role;
+  els.netInvite.hidden = !open;
   els.netLed.className = "led " + (linked ? "on" : net.role ? "wait" : "");
   els.netText.textContent =
-    guest ? (linked ? "online · " + pname(0) + "'s room" : "joining room " + net.code + "…")
-    : host ? (!net.peer || !net.peer.open ? "opening a room…" : linked ? "online · " + pname(1) + " is in" : "room " + net.code)
-    : "same device — or";
-  els.pName[0].readOnly = guest;
-  els.pName[1].readOnly = host;
+    guest ? (linked ? "online · " + pname(0) + "'s room" + (vs.players.length > 2 ? " · " + vs.players.filter((p, i) => present(i)).length + " here" : "") : "joining room " + net.code + "…")
+    : host ? (!open ? "opening a room…" : "room " + net.code + " · " + (friends ? friends + (friends === 1 ? " friend" : " friends") + " in" : "invite the Jam"))
+    : "same device — or online";
+  renderPlayers();
   renderJam();
 }
 
@@ -1704,25 +1874,17 @@ async function startHosting() {
   if (net.role !== "host") return;
   net.code = makeCode();
   net.jam = jamUrl(els.jamLink.value);
+  // a new room is a new game: the host on seat 0, everyone else pulls up a chair as they join
+  net.conns = [null]; net.seatOf = new Map();
+  vs.players = [{ name: localPlayers()[0].name, points: 0, wins: 0 }];
+  vs.guesses = [];
+  updateScore();
   const peer = new Peer("gtt-" + net.code, peerOptions());
   net.peer = peer;
   peer.on("open", () => { console.log("[gtt] hosting room", net.code); renderNet(); });
   peer.on("connection", (conn) => {
-    const id = conn.metadata && conn.metadata.id;
-    if (netLinked() && id !== net.guestId) {
-      conn.on("data", (m) => { if (m && m.t === "sync") { conn.send({ t: "full" }); setTimeout(() => conn.close(), 500); } });
-      return;
-    }
-    const old = net.conn;
-    net.conn = conn; net.guestId = id;
-    if (old) old.close();
-    conn.on("open", renderNet);
-    conn.on("data", (msg) => { try { onHostData(msg); } catch (e) { console.error("[gtt] bad message", e); } });
-    conn.on("close", () => {
-      if (net.conn !== conn) return;
-      net.conn = null; renderNet();
-      setStatus(pname(1) + " left — the invite still works");
-    });
+    conn.on("data", (msg) => { try { onHostData(conn, msg); } catch (e) { console.error("[gtt] bad message", e); } });
+    conn.on("close", () => hostDrop(conn));
   });
   peer.on("disconnected", () => { if (net.peer === peer && !peer.destroyed) peer.reconnect(); });
   peer.on("error", (e) => {
@@ -1738,75 +1900,114 @@ async function startHosting() {
 
 function stopHosting(quiet) {
   if (net.role !== "host") return;
+  setPublic(false);
   netSend({ t: "bye" });
   const peer = net.peer;
-  Object.assign(net, { role: null, peer: null, conn: null, code: null, guestId: null, lastResult: null, jam: "" });
+  Object.assign(net, { role: null, peer: null, conns: [], seatOf: new Map(), code: null, lastResult: null, jam: "" });
   if (peer) setTimeout(() => peer.destroy(), 200);
+  vs.players = localPlayers(); vs.guesses = [];
+  updateScore();
   renderNet();
   if (!quiet) replayRound();
 }
 
+// a guest says hi (and again after every reload): give them a seat — their old one if they had one
+function hostSeat(conn, msg) {
+  const id = str(conn.metadata && conn.metadata.id, 40) || conn.peer;
+  let seat = net.seatOf.get(id);
+  if (seat === undefined) {
+    if (vs.players.length >= MAX_PLAYERS) { sendTo(conn, { t: "full" }); setTimeout(() => conn.close(), 500); return; }
+    seat = vs.players.push({ name: "", points: 0, wins: 0 }) - 1;
+    net.seatOf.set(id, seat);
+  }
+  const old = net.conns[seat];
+  net.conns[seat] = conn;
+  if (old && old !== conn) old.close();
+  const fresh = vs.players[seat].away !== false;
+  vs.players[seat].name = str(msg.name, 12);
+  vs.players[seat].away = false;
+  netSync(conn, seat);
+  netSend({ t: "players", players: vs.players });
+  updateScore(); renderNet();
+  if (fresh) setStatus(pname(seat) + " joined" + (state.track && !state.revealed && !vsMeLocked() ? " — go" : ""));
+}
+
+// a guest's link dropped: keep their seat and points for a rejoin, stop waiting on them
+function hostDrop(conn) {
+  const seat = net.conns.indexOf(conn);
+  if (seat < 1) return;
+  net.conns[seat] = null;
+  vs.players[seat].away = true;
+  netSend({ t: "players", players: vs.players });
+  updateScore(); renderNet();
+  setStatus(pname(seat) + " left — the invite still works");
+  vsMaybeResolve();
+}
+
 // bring a (re)joining guest up to date
-function netSync() {
-  netSend({ t: "hello", players: vs.players, imode: state.imode, jam: net.jam });
+function netSync(conn, seat) {
+  const send = (msg) => sendTo(conn, msg);
+  send({ t: "hello", seat, players: vs.players, imode: state.imode, jam: net.jam });
   if (!state.track) return;
   const key = state.trackKey;
   if (state.revealed) {
-    if (net.lastResult && net.lastResult.key === key) netSend(net.lastResult);
+    if (net.lastResult && net.lastResult.key === key) send(net.lastResult);
     return;
   }
-  netSend({ t: "round", key, carry: "", players: vs.players });
+  send({ t: "round", key, carry: "", players: vs.players });
   if (state.imode === "pick") {
-    if (state.choicesFailed) netSend({ t: "choices", key, failed: true });
-    else if (state.choice.opts) netSend({ t: "choices", key, opts: state.choice.opts });
+    if (state.choicesFailed) send({ t: "choices", key, failed: true });
+    else if (state.choice.opts) send({ t: "choices", key, opts: state.choice.opts });
   }
-  vs.guesses.forEach((g, who) => { if (g) netSend({ t: "locked", who, verb: "locked in" }); });
-  if (state.colors && state.colors.key === key) netSend({ t: "colors", key, colors: state.colors.colors });
-  netSendPos();
-  setStatus("your friend joined — go");
+  vs.guesses.forEach((g, who) => { if (g) send({ t: "locked", key, who, verb: "locked in" }); });
+  if (state.colors && state.colors.key === key) send({ t: "colors", key, colors: state.colors.colors });
+  netSendPos(conn);
 }
 
 const BAD3 = ["bad", "bad", "bad"];
 const str = (v, max = 200) => String(v == null ? "" : v).slice(0, max);
 
-function onHostData(msg) {
+function onHostData(conn, msg) {
   if (!msg || typeof msg !== "object") return;
-  if (msg.t === "bye") { if (net.conn) net.conn.close(); return; }
-  if (msg.t === "sync") {
-    vs.players[1].name = str(msg.name, 12);
-    els.pName[1].value = vs.players[1].name;
-    netSync(); renderNet();
-    return;
-  }
+  if (msg.t === "sync") { hostSeat(conn, msg); return; }
+  const seat = net.conns.indexOf(conn);
+  if (seat < 1) return;
+  if (msg.t === "bye") { conn.close(); return; }
   if (msg.t === "name") {
-    vs.players[1].name = str(msg.name, 12);
-    els.pName[1].value = vs.players[1].name;
-    renderNet();
+    vs.players[seat].name = str(msg.name, 12);
+    netSend({ t: "players", players: vs.players });
+    updateScore(); renderNet();
     return;
   }
-  if (msg.t !== "guess" || msg.key !== state.trackKey || !state.track || state.revealed || vs.guesses[1]) return;
+  if (msg.t !== "guess" || msg.key !== state.trackKey || !state.track || state.revealed || vs.guesses[seat]) return;
   let marks = BAD3;
   if (msg.kind === "type") marks = gradeTyped(str(msg.a), str(msg.s), str(msg.y, 8));
   else if (msg.kind === "pick" && state.choice.accepted && Array.isArray(msg.picks)) {
     marks = state.choice.accepted.map((acc, i) => (acc.includes(str(msg.picks[i])) ? "ok" : "bad"));
   }
-  vsLock(marks, msg.kind === "pass" ? "passed" : "locked in", 1);
+  vsLock(marks, msg.kind === "pass" ? "passed" : "locked in", seat);
 }
 
 function guestLock(guess) {
   net.myLocked = true;
   netSend({ t: "guess", key: state.trackKey, ...guess });
-  showLocked(1, guess.kind === "pass" ? "passed" : "locked in");
+  showLocked(net.seat, guess.kind === "pass" ? "passed" : "locked in");
 }
 
+// guest: the host's roster is the truth, except for my own name
 function setPlayers(players) {
-  if (!Array.isArray(players)) return;
-  players.slice(0, 2).forEach((p, i) => {
-    vs.players[i].points = Number(p.points) || 0;
-    vs.players[i].wins = Number(p.wins) || 0;
-    if (i === 0) { vs.players[0].name = str(p.name, 12); els.pName[0].value = vs.players[0].name; }
-  });
+  if (!Array.isArray(players) || !players.length) return;
+  vs.players = players.slice(0, MAX_PLAYERS).map((p, i) => ({
+    name: i === net.seat ? net.myName : str(p && p.name, 12),
+    points: Number(p && p.points) || 0,
+    wins: Number(p && p.wins) || 0,
+    away: !!(p && p.away),
+  }));
   updateScore();
+}
+
+function seatOk(v) {
+  return Number.isInteger(v) && v >= 0 && v < vs.players.length;
 }
 
 function cleanTrack(t) {
@@ -1826,14 +2027,16 @@ function onGuestData(msg) {
   if (!msg || typeof msg !== "object") return;
   switch (msg.t) {
     case "hello":
+      if (!Number.isInteger(msg.seat) || msg.seat < 1 || msg.seat >= MAX_PLAYERS) break;
       net.synced = true;
+      net.seat = msg.seat;
       if (jamUrl(msg.jam)) net.jam = jamUrl(msg.jam);
       setPlayers(msg.players);
       if (msg.imode === "type" || msg.imode === "pick") setImode(msg.imode);
       renderNet();
       break;
-    case "name":
-      vs.players[0].name = str(msg.name, 12); els.pName[0].value = vs.players[0].name;
+    case "players":
+      setPlayers(msg.players);
       renderNet();
       break;
     case "jam":
@@ -1855,9 +2058,9 @@ function onGuestData(msg) {
       if (!net.myLocked) renderStage();
       break;
     case "locked":
-      if (msg.key !== undefined && msg.key !== state.trackKey) break;
-      if (msg.who === 1) net.myLocked = true;
-      if (msg.who === 0 || msg.who === 1) showLocked(msg.who, msg.verb === "passed" ? "passed" : "locked in");
+      if (msg.key !== state.trackKey || state.revealed || !seatOk(msg.who)) break;
+      if (msg.who === net.seat) net.myLocked = true;
+      showLocked(msg.who, msg.verb === "passed" ? "passed" : "locked in");
       break;
     case "colors":
       if (msg.key !== state.trackKey || !Array.isArray(msg.colors)) break;
@@ -1871,12 +2074,13 @@ function onGuestData(msg) {
     case "result": {
       if (msg.key !== state.trackKey || state.revealed) break;
       state.track = cleanTrack(msg.track);
-      vs.guesses = [0, 1].map((i) => {
-        const g = (msg.guesses || [])[i] || {};
-        return { marks: [0, 1, 2].map((k) => (["ok", "close", "bad"].includes(g.marks && g.marks[k]) ? g.marks[k] : "bad")), earned: Number(g.earned) || 0 };
-      });
       setPlayers(msg.players);
-      vsShowResult(msg.w === 0 || msg.w === 1 ? msg.w : -1, str(msg.msg));
+      vs.guesses = [];
+      (Array.isArray(msg.guesses) ? msg.guesses : []).slice(0, vs.players.length).forEach((g, i) => {
+        if (!g || typeof g !== "object") return;
+        vs.guesses[i] = { marks: [0, 1, 2].map((k) => (["ok", "close", "bad"].includes(g.marks && g.marks[k]) ? g.marks[k] : "bad")), earned: Number(g.earned) || 0 };
+      });
+      vsShowResult(seatOk(msg.w) && vs.guesses[msg.w] ? msg.w : -1, str(msg.msg));
       break;
     }
     case "skip":
@@ -1886,7 +2090,7 @@ function onGuestData(msg) {
       break;
     case "full":
       net.synced = net.closedByHost = true;
-      setStatus("that room's full — two players max");
+      setStatus("that room's full — " + MAX_PLAYERS + " players max");
       break;
     case "bye":
       net.closedByHost = true;
@@ -1897,8 +2101,10 @@ function onGuestData(msg) {
 
 async function startGuest(code, jam) {
   net.role = "guest"; net.code = code; net.jam = jamUrl(jam);
+  net.myName = localPlayers()[1].name;
   state.mode = "guest";
   vs.on = true;
+  vs.players = [{ name: "", points: 0, wins: 0 }]; // the host's seat, until they say hello
   els.app.classList.add("vs", "guest");
   els.imodes.forEach((b) => { b.disabled = true; });
   setConn("wait", "no Spotify needed — the host is playing");
@@ -1913,7 +2119,7 @@ async function startGuest(code, jam) {
     conn.on("open", () => {
       setConn("on", "listening along with the host");
       setStatus("joined — waiting for the next song");
-      const askSync = () => { if (!net.synced && net.conn === conn && conn.open) { netSend({ t: "sync", name: vs.players[1].name }); setTimeout(askSync, 2500); } };
+      const askSync = () => { if (!net.synced && net.conn === conn && conn.open) { netSend({ t: "sync", name: net.myName }); setTimeout(askSync, 2500); } };
       askSync();
       renderNet();
     });
@@ -1931,12 +2137,13 @@ async function startGuest(code, jam) {
   });
 }
 
+let tabId = null;
 function deviceId() {
   try {
     let id = localStorage.getItem("gtt_device");
     if (!id) { id = makeCode() + makeCode(); localStorage.setItem("gtt_device", id); }
     return id;
-  } catch { return "anon"; }
+  } catch { return tabId ||= "t" + makeCode() + makeCode(); } // no storage: still unique, so nobody steals a seat
 }
 
 // WebRTC can take ~30s to notice a closed tab, so say goodbye explicitly
@@ -1954,7 +2161,7 @@ els.jamLink.addEventListener("input", () => {
   if (net.role !== "host" || url === net.jam || (v && !url)) return;
   net.jam = url;
   netSend({ t: "jam", url });
-  if (url) setStatus(netLinked() ? "Jam link sent to " + pname(1) : "Jam link added to the invite");
+  if (url) setStatus(netLinked() ? "Jam link sent to everyone in the room" : "Jam link added to the invite");
 });
 
 els.netBtn.onclick = () => {
@@ -1967,16 +2174,185 @@ els.netInvite.onclick = async () => {
   const nav = els.app.ownerDocument.defaultView.navigator;
   try {
     if (nav.share && matchMedia("(pointer: coarse)").matches) await nav.share({ title: "Guess the Track", text: "Join my Guess the Track room" + (net.jam ? " — the Spotify Jam button is inside" : ""), url });
-    else { await nav.clipboard.writeText(url); setStatus("invite link copied — send it to your friend"); }
+    else { await nav.clipboard.writeText(url); setStatus("invite link copied — drop it in the Jam chat, up to " + (MAX_PLAYERS - 1) + " friends can join"); }
   } catch {
     setStatus("invite: " + url);
   }
 };
 
+// ---------- public rooms: a serverless lobby on well-known PeerJS ids ----------
+// a public room also claims one of LOBBY_SLOTS lobby ids and answers anyone who knocks with
+// what's on; the room browser knocks on every slot and lists whoever answers
+
+function setPublic(on) {
+  pub.on = on && net.role === "host";
+  if (pub.on) claimSlot(0, Math.floor(Math.random() * LOBBY_SLOTS)); else dropSlot();
+  renderJam();
+}
+
+function dropSlot() {
+  if (pub.peer) pub.peer.destroy();
+  pub.peer = null; pub.slot = -1;
+}
+
+// try slots from a random start so two hosts don't fight over slot 0
+function claimSlot(tries, start) {
+  dropSlot();
+  if (!pub.on || net.role !== "host") return;
+  if (tries >= LOBBY_SLOTS) {
+    pub.on = false; renderJam();
+    setStatus("the public lobby is full — share the invite link instead");
+    return;
+  }
+  const slot = (start + tries) % LOBBY_SLOTS;
+  const peer = new Peer(lobbyId(slot), peerOptions());
+  pub.peer = peer;
+  peer.on("open", () => {
+    if (pub.peer !== peer) return;
+    pub.slot = slot; renderJam();
+    console.log("[gtt] listed publicly in slot", slot);
+    setStatus("room listed — anyone can find it under VS → 🌍 Find");
+  });
+  // a message sent the instant a channel opens can get lost, so the browser keeps asking until it hears back
+  peer.on("connection", (conn) => {
+    conn.on("open", () => { sendTo(conn, roomInfo()); setTimeout(() => conn.close(), 4000); });
+    conn.on("data", (m) => { if (m && m.t === "who") sendTo(conn, roomInfo()); });
+  });
+  peer.on("disconnected", () => { if (pub.peer === peer && !peer.destroyed) peer.reconnect(); });
+  peer.on("error", (e) => {
+    if (pub.peer !== peer) return;
+    if (e.type === "unavailable-id") { claimSlot(tries + 1, start); return; }
+    console.error("[gtt] lobby error", e.type, e);
+    if (e.type === "network" || e.type === "server-error" || e.type === "socket-error" || e.type === "browser-incompatible") {
+      pub.on = false; dropSlot(); renderJam();
+      setStatus("couldn't list the room (" + e.type + ")");
+    }
+  });
+}
+
+function roomInfo() {
+  return {
+    t: "room", v: 1, code: net.code, name: pname(0), imode: state.imode, jam: net.jam,
+    players: vs.players.filter((p, i) => present(i)).length, full: vs.players.length >= MAX_PLAYERS,
+  };
+}
+
+function cleanRoom(m) {
+  if (!m || typeof m !== "object" || m.t !== "room") return null;
+  const code = str(m.code, 8).toUpperCase();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) return null;
+  return {
+    code, name: str(m.name, 12).trim() || "someone", jam: jamUrl(m.jam), imode: m.imode === "pick" ? "pick" : "type",
+    players: Math.max(1, Math.min(MAX_PLAYERS, Math.floor(Number(m.players)) || 1)), full: !!m.full,
+  };
+}
+
+async function scanRooms() {
+  if (lobby.scanning) return;
+  lobby.rooms.clear(); lobby.error = ""; lobby.scanning = true;
+  renderLobby();
+  try { await loadPeerJs(); } catch (e) { lobby.scanning = false; lobby.error = "can't look for rooms — " + e.message; renderLobby(); return; }
+  const peer = new Peer(undefined, peerOptions());
+  lobby.peer = peer;
+  const pending = new Set();
+  let timer = 0;
+  const done = () => {
+    if (lobby.peer !== peer) return;
+    clearTimeout(timer);
+    lobby.peer = null; lobby.scanning = false;
+    setTimeout(() => peer.destroy(), 500);
+    renderLobby();
+  };
+  const settle = (i) => { pending.delete(i); if (!pending.size) done(); };
+  peer.on("open", () => {
+    for (let i = 0; i < LOBBY_SLOTS; i++) {
+      pending.add(i);
+      const conn = peer.connect(lobbyId(i), { reliable: true });
+      let ask = 0;
+      conn.on("open", () => {
+        const who = () => { if (conn.open && pending.has(i)) { sendTo(conn, { t: "who" }); ask = setTimeout(who, 600); } };
+        who();
+      });
+      conn.on("data", (m) => {
+        const room = cleanRoom(m);
+        if (!room) return;
+        clearTimeout(ask);
+        if (lobby.peer === peer) { lobby.rooms.set(room.code, room); renderLobby(); }
+        settle(i); conn.close();
+      });
+      conn.on("close", () => { clearTimeout(ask); settle(i); });
+    }
+    // empty slots report back once the PeerJS server gives up on them (~5s); this catches a slot whose WebRTC never connects
+    timer = setTimeout(done, 8000);
+  });
+  peer.on("error", (e) => {
+    const m = /gtt-lobby-v1-(\d+)/.exec(e.message || "");
+    if (e.type === "peer-unavailable") { if (m) settle(Number(m[1])); return; } // empty slot
+    console.error("[gtt] lobby scan error", e.type, e);
+    lobby.error = "couldn't reach the lobby (" + e.type + ")";
+    done();
+  });
+}
+
+function joinUrl(code, jam) {
+  return location.pathname + "?join=" + code + (jam ? "&jam=" + encodeURIComponent(jam) : "");
+}
+
+function renderLobby() {
+  els.lobby.classList.toggle("show", lobby.open);
+  els.roomsBtn.setAttribute("aria-pressed", String(lobby.open));
+  if (!lobby.open) return;
+  els.lobbyRefresh.disabled = lobby.scanning;
+  els.lobbyLogin.hidden = state.mode !== "lobby";
+  els.lobbyClose.hidden = state.mode === "lobby"; // nothing else to do here without Spotify
+  const rooms = [...lobby.rooms.values()].sort((a, b) => b.players - a.players);
+  els.lobbyList.replaceChildren(...rooms.map((r) => {
+    const row = document.createElement("div");
+    row.className = "room";
+    const txt = document.createElement("div");
+    const name = document.createElement("b");
+    name.textContent = r.name + "'s room";
+    const meta = document.createElement("span");
+    meta.textContent = r.players + (r.players === 1 ? " player" : " playing") + " · " + (r.imode === "pick" ? "Pick 5" : "Type")
+      + " · " + (r.jam ? "🎧 Jam" : "no Jam yet");
+    txt.append(name, meta);
+    const b = document.createElement("button");
+    b.type = "button";
+    const mine = net.role === "host" && r.code === net.code;
+    b.textContent = mine ? "Yours" : r.full ? "Full" : "Join";
+    b.disabled = mine || r.full;
+    b.onclick = () => { if (net.peer) net.peer.destroy(); location.href = joinUrl(r.code, r.jam); };
+    row.append(txt, b);
+    return row;
+  }));
+  els.lobbyNote.textContent = lobby.scanning ? "looking for rooms…" : lobby.error
+    || (rooms.length ? "" : "no public rooms right now — host one: VS → Host → 🌍");
+  els.lobbyNote.hidden = !els.lobbyNote.textContent;
+}
+
+function setLobbyOpen(open) {
+  lobby.open = open;
+  renderLobby();
+  if (open) scanRooms();
+}
+
+els.pubBtn.onclick = () => setPublic(!pub.on);
+els.roomsBtn.onclick = () => setLobbyOpen(!lobby.open);
+els.lobbyRefresh.onclick = scanRooms;
+els.lobbyClose.onclick = () => setLobbyOpen(false);
+els.lobbyLogin.onclick = () => { location.href = location.pathname; };
+
 const params = new URL(location.href).searchParams;
 const joinCode = params.get("join");
 if (joinCode) startGuest(joinCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8), params.get("jam"));
-else startSpotify();
+else if (params.has("rooms")) {
+  // browse without logging in to Spotify: joining a room doesn't need it
+  state.mode = "lobby";
+  els.app.classList.add("lobby");
+  setConn("off", "not logged in — joining doesn't need Spotify");
+  setStatus("pick a room to join");
+  setLobbyOpen(true);
+} else startSpotify();
 renderNet();
 </script>
 </body>
