@@ -450,6 +450,17 @@ const CONFIG = {
   pollMs: 5000,
 };
 
+// optional: a Firebase project for the public lobby (a live room list in the Realtime Database).
+// left blank, public rooms use the PeerJS lobby slots instead. Setup: FIREBASE.md
+const FIREBASE = window.GTT_FIREBASE || {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  appId: "",
+};
+const useFirebase = !!(FIREBASE.apiKey && FIREBASE.databaseURL);
+
 const state = {
   mode: "idle",
   imode: "type", choicesFailed: false,
@@ -494,8 +505,8 @@ const net = {
 // public rooms (see the lobby section at the bottom)
 const LOBBY_SLOTS = 16;
 const lobbyId = (i) => "gtt-lobby-v1-" + i;
-const pub = { on: false, peer: null, slot: -1 };
-const lobby = { open: false, peer: null, rooms: new Map(), scanning: false, error: "" };
+const pub = { on: false, listed: false, peer: null, slot: -1, fb: null };
+const lobby = { open: false, peer: null, rooms: new Map(), scanning: false, error: "", unwatch: null };
 
 function storedNames() {
   try { const n = JSON.parse(localStorage.getItem("gtt_players") || "[]"); return Array.isArray(n) ? n : []; } catch { return []; }
@@ -923,7 +934,7 @@ function setImode(imode) {
   state.choice = { stage: 0, opts: null, accepted: null, results: [], picks: [] };
   els.choiceList.replaceChildren();
   els.choiceLabel.textContent = "";
-  if (net.role === "host") netSend({ t: "imode", imode });
+  if (net.role === "host") { netSend({ t: "imode", imode }); fbSyncSoon(); }
   if (imode === "pick" && state.track && !state.revealed) { setupChoices(state.track); return; }
   applyInputUI();
   if (imode === "pick") setStatus("pick mode on — options come with the next track");
@@ -1839,10 +1850,11 @@ function renderJam() {
   els.pubBtn.hidden = !host;
   els.pubBtn.disabled = !(net.peer && net.peer.open);
   els.pubBtn.setAttribute("aria-pressed", String(pub.on));
-  els.pubBtn.textContent = pub.on ? (pub.slot >= 0 ? "🌍 Public — anyone can find this room" : "🌍 Listing…") : "🌍 List this room publicly";
-  els.pubHint.hidden = !(host && pub.on && pub.slot >= 0);
+  els.pubBtn.textContent = pub.on ? (pub.listed ? "🌍 Public — anyone can find this room" : "🌍 Listing…") : "🌍 List this room publicly";
+  els.pubHint.hidden = !(host && pub.on && pub.listed);
   els.pubHint.textContent = net.jam ? "heads up: strangers can join your Jam too — check who can add songs in its settings"
     : "listed — add a Jam link above, or the people who join won't hear the music";
+  fbSyncSoon();
 }
 
 function renderNet() {
@@ -2186,13 +2198,16 @@ els.netInvite.onclick = async () => {
 
 function setPublic(on) {
   pub.on = on && net.role === "host";
-  if (pub.on) claimSlot(0, Math.floor(Math.random() * LOBBY_SLOTS)); else dropSlot();
+  if (pub.on) {
+    if (useFirebase) fbList(); else claimSlot(0, Math.floor(Math.random() * LOBBY_SLOTS));
+  } else dropSlot();
   renderJam();
 }
 
 function dropSlot() {
   if (pub.peer) pub.peer.destroy();
-  pub.peer = null; pub.slot = -1;
+  pub.peer = null; pub.slot = -1; pub.listed = false;
+  fbUnlist();
 }
 
 // try slots from a random start so two hosts don't fight over slot 0
@@ -2209,7 +2224,7 @@ function claimSlot(tries, start) {
   pub.peer = peer;
   peer.on("open", () => {
     if (pub.peer !== peer) return;
-    pub.slot = slot; renderJam();
+    pub.slot = slot; pub.listed = true; renderJam();
     console.log("[gtt] listed publicly in slot", slot);
     setStatus("room listed — anyone can find it under VS → 🌍 Find");
   });
@@ -2248,6 +2263,7 @@ function cleanRoom(m) {
 }
 
 async function scanRooms() {
+  if (useFirebase) return fbWatchRooms();
   if (lobby.scanning) return;
   lobby.rooms.clear(); lobby.error = ""; lobby.scanning = true;
   renderLobby();
@@ -2303,6 +2319,7 @@ function renderLobby() {
   els.roomsBtn.setAttribute("aria-pressed", String(lobby.open));
   if (!lobby.open) return;
   els.lobbyRefresh.disabled = lobby.scanning;
+  els.lobbyRefresh.hidden = useFirebase; // the Firebase list is live
   els.lobbyLogin.hidden = state.mode !== "lobby";
   els.lobbyClose.hidden = state.mode === "lobby"; // nothing else to do here without Spotify
   const rooms = [...lobby.rooms.values()].sort((a, b) => b.players - a.players);
@@ -2333,7 +2350,125 @@ function renderLobby() {
 function setLobbyOpen(open) {
   lobby.open = open;
   renderLobby();
-  if (open) scanRooms();
+  if (open) scanRooms(); else fbUnwatchRooms();
+}
+
+// ---------- public rooms on Firebase (when FIREBASE is filled in) ----------
+// rooms/<code> holds what roomInfo() says; the host owns its entry through an anonymous
+// sign-in, and the database deletes it by itself the moment the host's connection drops
+const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
+let fbLib = null, fbUser = null;
+function loadFirebase() {
+  return fbLib ||= Promise.all(["app", "auth", "database"].map((m) => import(FIREBASE_SDK + "firebase-" + m + ".js")))
+    .then(([app, auth, db]) => {
+      const fa = app.initializeApp(FIREBASE);
+      return { auth, db, fa, root: db.getDatabase(fa) };
+    })
+    .catch((e) => { fbLib = null; throw new Error("couldn't load Firebase"); });
+}
+
+// only a host listing a room signs in; browsing the list needs no account
+function firebaseUser(fb) {
+  return fbUser ||= fb.auth.signInAnonymously(fb.auth.getAuth(fb.fa)).then((c) => c.user.uid)
+    .catch((e) => { fbUser = null; throw e; });
+}
+
+function fbRoom(uid) {
+  const r = roomInfo();
+  return {
+    uid, name: r.name.slice(0, 12), imode: r.imode, jam: r.jam || null, players: r.players, full: r.full,
+    at: pub.fb.db.serverTimestamp(),
+  };
+}
+
+async function fbList() {
+  const code = net.code;
+  try {
+    const fb = await loadFirebase();
+    const uid = await firebaseUser(fb);
+    if (!pub.on || net.code !== code || pub.fb) return;
+    const room = fb.db.ref(fb.root, "rooms/" + code);
+    pub.fb = { db: fb.db, room, uid, sent: "", timer: 0, unwatch: null };
+    const me = pub.fb;
+    // (re)write the entry every time the connection comes up: a dropped connection already deleted it
+    me.unwatch = fb.db.onValue(fb.db.ref(fb.root, ".info/connected"), async (snap) => {
+      if (!snap.val() || pub.fb !== me) return;
+      try {
+        await fb.db.onDisconnect(room).remove();
+        const data = fbRoom(uid);
+        await fb.db.set(room, data);
+        if (pub.fb !== me) return;
+        me.sent = fbKey(data);
+        if (!pub.listed) {
+          pub.listed = true; renderJam();
+          console.log("[gtt] listed publicly on Firebase", code);
+          setStatus("room listed — anyone can find it under VS → 🌍 Find");
+        }
+      } catch (e) { fbListFailed(me, e); }
+    });
+  } catch (e) { fbListFailed(pub.fb, e); }
+}
+
+function fbListFailed(me, e) {
+  console.error("[gtt] Firebase listing error", e);
+  if (pub.fb !== me || !pub.on) return;
+  pub.on = false; dropSlot(); renderJam();
+  setStatus("couldn't list the room (" + (e.code || e.message) + ")");
+}
+
+function fbUnlist() {
+  const me = pub.fb;
+  if (!me) return;
+  pub.fb = null;
+  clearTimeout(me.timer);
+  if (me.unwatch) me.unwatch();
+  me.db.onDisconnect(me.room).cancel().catch(() => {});
+  me.db.remove(me.room).catch(() => {});
+}
+
+const fbKey = (d) => JSON.stringify({ ...d, at: 0 });
+
+// players, names and the Jam link change while a room's listed; batch them into one write
+function fbSyncSoon() {
+  const me = pub.fb;
+  if (!me || !pub.listed || me.timer) return;
+  me.timer = setTimeout(() => {
+    me.timer = 0;
+    if (pub.fb !== me || net.role !== "host") return;
+    const data = fbRoom(me.uid), key = fbKey(data);
+    if (key === me.sent) return;
+    me.sent = key;
+    me.db.set(me.room, data).catch((e) => console.error("[gtt] Firebase update error", e));
+  }, 500);
+}
+
+async function fbWatchRooms() {
+  fbUnwatchRooms();
+  lobby.rooms.clear(); lobby.error = ""; lobby.scanning = true;
+  renderLobby();
+  let fb;
+  try { fb = await loadFirebase(); } catch (e) { lobby.scanning = false; lobby.error = "can't look for rooms — " + e.message; renderLobby(); return; }
+  if (!lobby.open || lobby.unwatch) return;
+  const rooms = fb.db.query(fb.db.ref(fb.root, "rooms"), fb.db.limitToLast(100));
+  lobby.unwatch = fb.db.onValue(rooms, (snap) => {
+    lobby.rooms.clear();
+    snap.forEach((c) => {
+      const room = cleanRoom({ ...c.val(), t: "room", code: c.key });
+      if (room) lobby.rooms.set(room.code, room);
+    });
+    lobby.scanning = false; lobby.error = "";
+    renderLobby();
+  }, (e) => {
+    console.error("[gtt] Firebase lobby error", e);
+    lobby.unwatch = null; lobby.scanning = false;
+    lobby.error = "couldn't reach the lobby (" + (e.code || e.message) + ")";
+    renderLobby();
+  });
+}
+
+function fbUnwatchRooms() {
+  if (lobby.unwatch) lobby.unwatch();
+  lobby.unwatch = null;
 }
 
 els.pubBtn.onclick = () => setPublic(!pub.on);

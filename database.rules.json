@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "rooms": {
+      ".read": true,
+      "$code": {
+        ".write": "auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
+        ".validate": "$code.matches(/^[A-Z0-9]{4,8}$/) && newData.hasChildren(['uid', 'name', 'imode', 'players', 'full', 'at'])",
+        "uid": { ".validate": "newData.val() === auth.uid" },
+        "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "imode": { ".validate": "newData.val() === 'type' || newData.val() === 'pick'" },
+        "jam": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+        "players": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 32" },
+        "full": { ".validate": "newData.isBoolean()" },
+        "at": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
