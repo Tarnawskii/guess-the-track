@@ -107,15 +107,45 @@
     background: linear-gradient(135deg, var(--mustard), var(--orange));
     color: var(--ink); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.35);
   }
-  #conn { display: flex; align-items: center; justify-content: center; gap: 0.4375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2); min-height: 1rem; }
-  #reconnect {
-    min-height: 2rem; margin: -0.5rem 0 -0.5rem 0.25rem; padding: 0 0.625rem; border-radius: 999px;
-    font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--mustard); background: transparent;
+  /* Spotify connection: an on-air light sitting on the card's top edge; hover or tap it for the details + reconnect */
+  #live {
+    position: absolute; z-index: 3; top: -0.75rem; right: 1.25rem; max-width: calc(100% - 2.5rem);
+    display: flex; align-items: center; height: 1.5rem; padding: 0 0.4375rem; border-radius: 999px;
+    background: #1d1117; box-shadow: 0 0 0 1px var(--hairline), 0 0.375rem 1rem rgba(0, 0, 0, 0.55);
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; color: var(--label2);
   }
-  .led { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--label3); flex: none; transition: background-color 200ms var(--ease); }
-  .led.on { background: var(--ok); box-shadow: 0 0 0.5rem rgba(168, 224, 99, 0.7); animation: pulse 2.4s infinite; }
-  .led.wait { background: var(--mustard); animation: pulse 0.9s infinite; }
-  .led.off { background: var(--bad); box-shadow: 0 0 0.5rem rgba(255, 90, 79, 0.6); }
+  body > #live { position: fixed; top: 0.25rem; right: 0.5rem; } /* in the pop-out window */
+  #liveBtn {
+    position: relative; display: flex; align-items: center; min-height: 1.5rem; padding: 0; gap: 0;
+    font: inherit; color: inherit; letter-spacing: inherit; background: transparent; border-radius: 999px;
+  }
+  #liveBtn::before { content: ""; position: absolute; inset: -0.625rem -0.5rem; } /* a thumb-sized target for a small light */
+  #liveBtn:active, #reconnect:active { transform: none; }
+  @media (hover: hover) and (pointer: fine) { #liveBtn:hover { background: transparent; } }
+  #connText, #reconnect {
+    max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    transition: max-width 360ms var(--ease-out), opacity 200ms var(--ease), padding 360ms var(--ease-out), margin 360ms var(--ease-out);
+  }
+  #reconnect {
+    min-height: 1.5rem; padding: 0; border-radius: 999px; background: transparent;
+    font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--mustard);
+  }
+  #live.open #connText { max-width: 14rem; opacity: 1; margin-left: 0.4375rem; }
+  #live.open #reconnect { max-width: 6rem; opacity: 1; padding: 0 0.25rem 0 0.5rem; }
+  @media (hover: hover) and (pointer: fine) {
+    #live:hover #connText, #live:focus-within #connText { max-width: 14rem; opacity: 1; margin-left: 0.4375rem; }
+    #live:hover #reconnect, #live:focus-within #reconnect { max-width: 6rem; opacity: 1; padding: 0 0.25rem 0 0.5rem; }
+    #reconnect:hover { background: transparent; color: var(--cream); }
+  }
+  :root:has(#app.guest) #reconnect, :root:has(#app.lobby) #reconnect { display: none; }
+  .led { position: relative; width: 0.5625rem; height: 0.5625rem; border-radius: 50%; background: var(--label3); flex: none; transition: background-color 300ms var(--ease), box-shadow 300ms var(--ease); }
+  .led::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; opacity: 0; }
+  .led.on { background: var(--ok); box-shadow: 0 0 0.5rem rgba(168, 224, 99, 0.8); }
+  .led.on::after { animation: ping 2.4s var(--ease-out) infinite; }
+  .led.wait { background: var(--mustard); box-shadow: 0 0 0.5rem rgba(255, 194, 61, 0.7); }
+  .led.wait::after { animation: ping 1.1s var(--ease-out) infinite; }
+  .led.off { background: var(--bad); box-shadow: 0 0 0.5rem rgba(255, 90, 79, 0.7); }
+  @keyframes ping { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3); opacity: 0; } }
   @keyframes pulse { 50% { opacity: 0.35; } }
   .stage { position: relative; display: flex; align-items: center; gap: 0.75rem; }
   .deck { position: relative; width: 7.5rem; height: 7.5rem; flex: none; margin-right: 4rem; }
@@ -178,6 +208,53 @@
   .stat span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label2); }
   .stat b { font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .stat.hot b { color: var(--mustard); }
+  /* solo scoreboard: its own row under the pills, the streak told in flames */
+  #score { display: grid; grid-template-columns: 1fr 1.45fr 1fr; gap: 0.375rem; }
+  #score .stat {
+    flex-direction: column; align-items: center; justify-content: center; gap: 0.1875rem;
+    min-height: 3.375rem; padding: 0.375rem 0.5rem 0.4375rem; border-radius: 0.875rem;
+    transition: border-color 400ms var(--ease), box-shadow 400ms var(--ease), background-color 400ms var(--ease);
+  }
+  #score .stat > span { font-size: 0.5625rem; letter-spacing: 0.12em; }
+  #score .stat b { font-size: 1.375rem; line-height: 1; }
+  .streak { display: flex; align-items: center; gap: 0.375rem; }
+  .flames { display: flex; align-items: flex-end; gap: 0.0625rem; height: 1.375rem; }
+  .flame {
+    width: 0.9375rem; height: 1.1875rem; overflow: visible; transform-origin: 50% 92%;
+    --f1: rgba(251, 233, 208, 0.13); --f2: transparent;
+    transition: filter 400ms var(--ease);
+  }
+  .flame.lit {
+    --f1: url(#flOuter); --f2: url(#flCore);
+    filter: drop-shadow(0 0 0.25rem rgba(255, 122, 47, 0.55));
+    animation: flicker 1.7s ease-in-out infinite;
+  }
+  .flame.lit:nth-child(2) { animation-delay: -0.35s; }
+  .flame.lit:nth-child(3) { animation-delay: -0.9s; }
+  .flame.lit:nth-child(4) { animation-delay: -0.55s; }
+  .flame.lit:nth-child(5) { animation-delay: -1.2s; }
+  .flame.pop { animation: flame-pop 560ms var(--ease-back), flicker 1.7s ease-in-out 560ms infinite; }
+  .flame.out { --f1: url(#flOuter); --f2: url(#flCore); animation: fizzle 650ms ease-in forwards; }
+  #stStreak.hot {
+    border-color: rgba(255, 122, 47, 0.5);
+    background: radial-gradient(120% 150% at 50% 125%, rgba(255, 122, 47, 0.3), transparent 62%), rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 1.25rem rgba(255, 122, 47, 0.18);
+  }
+  #stStreak.hot .flame.lit { animation-duration: 1.05s; }
+  #stStreak.blaze { box-shadow: 0 0 1.5rem rgba(255, 194, 61, 0.28); animation: ember 2.4s ease-in-out infinite; }
+  #stStreak.blaze .flame.lit { filter: drop-shadow(0 0 0.375rem rgba(255, 194, 61, 0.85)); animation-duration: 0.8s; }
+  @keyframes flicker {
+    0%, 100% { transform: scale(1, 1) skewX(0deg); }
+    25% { transform: scale(0.93, 1.07) skewX(-3deg); }
+    50% { transform: scale(1.05, 0.95) skewX(2deg); }
+    75% { transform: scale(0.97, 1.04) skewX(-1.5deg); }
+  }
+  @keyframes flame-pop { from { transform: scale(0); } 60% { transform: scale(1.3, 1.35); } }
+  @keyframes fizzle { 40% { transform: scale(0.8, 1.1); opacity: 0.8; } to { transform: translateY(-0.625rem) scale(0.3); opacity: 0; } }
+  @keyframes ember { 50% { box-shadow: 0 0 2rem rgba(255, 122, 47, 0.38); } }
+  #app:not(.vs) .stage { justify-content: center; }
+  #app:not(.vs) .confetti { left: calc(50% - 2rem); }
+  .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
   #vsScore { display: none; }
   #app.vs #score { display: none; }
   #app.vs #vsScore { display: grid; }
@@ -556,8 +633,10 @@
   footer { font-size: 0.6875rem; color: var(--label3); text-align: center; letter-spacing: 0.03em; }
   kbd { font: inherit; font-weight: 700; color: var(--label2); padding: 0 0.25rem; border-radius: 0.25rem; background: var(--fill); }
   @media (prefers-reduced-motion: reduce) {
-    .lava i, .disc, .led, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
+    .lava i, .disc, .led, .led::after, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
     .confetti { display: none; }
+    .flame.lit, .flame.pop, #stStreak.blaze { animation: none; }
+    .flame.out { animation: none; opacity: 0; }
     .cover-inner, .record, .field .v, .disc-label { transition: none; }
     button:active { transform: none; }
     .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
@@ -566,8 +645,22 @@
 </head>
 <body>
 <div id="shell">
+<div id="live">
+  <button id="liveBtn" type="button" aria-expanded="false" aria-controls="connText" title="Spotify connection"><span id="led" class="led" aria-hidden="true"></span><span id="connText" role="status">not connected</span></button>
+  <button id="reconnect" type="button" title="Log in to Spotify again">reconnect</button>
+</div>
 <div id="app">
   <div class="lava" aria-hidden="true"><i></i><i></i><i></i></div>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="flOuter" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4f81" /><stop offset="0.55" stop-color="#ff7a2f" /><stop offset="1" stop-color="#ffc23d" /></linearGradient>
+      <linearGradient id="flCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd36a" /><stop offset="1" stop-color="#fff4c9" /></linearGradient>
+      <symbol id="flameShape" viewBox="0 0 24 30">
+        <path style="fill: var(--f1)" d="M12 1C13 6 17 8.5 19.5 13c2 3.6 1.9 8.6-.9 12-1.7 2.1-4 3.5-6.6 3.5S7.1 27.1 5.4 25C2.6 21.6 2.6 17 4.6 13.6c.8 2.6 2.2 4 3.8 4.6C7.8 11.6 9.6 5.6 12 1z" />
+        <path style="fill: var(--f2)" d="M12.6 13.5c.6 3.1 3 4.7 3.7 7.5.7 2.9-1.3 5.6-4.3 5.6S7.4 24.2 7.9 21.6c.3-1.4 1.1-2.4 2-3.2.3 1.4 1 2.2 1.8 2.5-.5-2.6-.1-5.3.9-7.4z" />
+      </symbol>
+    </defs>
+  </svg>
   <header>
     <h1>Guess the Track</h1>
     <div class="hbtns">
@@ -584,7 +677,6 @@
       <span class="pill-icon" aria-hidden="true">📡</span><span class="pill-text"><b>Radar</b><small>new music ▸</small></span>
     </button>
   </div>
-  <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button></div>
   <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="roomsBtn" aria-pressed="false" title="Public rooms — find a game to join">🌍 Find</button><button id="netBtn">Host</button></div>
   <div id="jam">
     <input id="jamLink" type="url" placeholder="Paste your Spotify Jam link so everyone hears it" aria-label="Spotify Jam link" autocomplete="off" />
@@ -599,6 +691,11 @@
     <div id="lobbyNote"></div>
     <button id="lobbyLogin" type="button" hidden>Log in with Spotify to host your own</button>
   </div>
+  <div class="stats" id="score">
+    <div class="stat" id="stPoints"><span>Points</span><b id="sPoints">0</b></div>
+    <div class="stat" id="stStreak"><span>Streak</span><div class="streak"><div class="flames" id="flames" aria-hidden="true"></div><b id="sStreak">0</b></div></div>
+    <div class="stat"><span>Rounds</span><b id="sRounds">0</b></div>
+  </div>
   <div class="stage" id="stage">
     <div class="deck">
       <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label" id="discLabel"></div></div></div>
@@ -608,11 +705,6 @@
           <div class="cover-face cover-back" id="coverBack"></div>
         </div>
       </div>
-    </div>
-    <div class="stats" id="score">
-      <div class="stat" id="stPoints"><span>Points</span><b id="sPoints">0</b></div>
-      <div class="stat" id="stStreak"><span>Streak</span><b id="sStreak">0</b></div>
-      <div class="stat"><span>Rounds</span><b id="sRounds">0</b></div>
     </div>
     <div class="stats" id="vsScore">
       <div class="stat" id="stSongs"><span>Songs</span><b id="sWins">0–0</b></div>
@@ -740,7 +832,7 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 // what stays glides to its new spot, what leaves fades out where it was, what arrives fades in after it
 const MORPH_EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 const shown = (el) => el.getClientRects().length > 0;
-const appKids = () => [...els.app.children].filter((el) => !el.classList.contains("lava") && !el.classList.contains("ghost"));
+const appKids = () => [...els.app.children].filter((el) => !el.classList.contains("lava") && !el.classList.contains("ghost") && !el.classList.contains("sprite"));
 const modesKids = () => [...els.modeConf.children, els.modesNote];
 
 // an element counts as "the same" only if what's visible inside it is the same
@@ -835,7 +927,7 @@ const els = {
   hdOpen: $("hdOpen"), hdFill: $("hdFill"), hdBar: $("hdBar"), hdInfo: $("hdInfo"), hdMore: $("hdMore"), hdPlay: $("hdPlay"),
   tlInfo: $("tlInfo"), tlNew: $("tlNew"), tlCards: $("tlCards"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
-  led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
+  led: $("led"), connText: $("connText"), reconnect: $("reconnect"), live: $("live"), liveBtn: $("liveBtn"),
   jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"), pubBtn: $("pubBtn"), pubHint: $("pubHint"),
   roomsBtn: $("roomsBtn"), lobby: $("lobby"), lobbyList: $("lobbyList"), lobbyNote: $("lobbyNote"),
   lobbyRefresh: $("lobbyRefresh"), lobbyClose: $("lobbyClose"), lobbyLogin: $("lobbyLogin"),
@@ -846,9 +938,23 @@ const els = {
 };
 const fields = [els.fArtist, els.fSong, els.fYear];
 
+// the light shows the state; the words come out on hover/tap, and on their own for a moment when it changes
+let liveFlash = 0;
 function setConn(cls, text) {
+  const changed = !els.led.classList.contains(cls);
   els.led.className = "led " + cls;
   if (text) els.connText.textContent = text;
+  els.liveBtn.setAttribute("aria-label", "Spotify: " + els.connText.textContent);
+  if (changed && cls !== "wait") {
+    setLiveOpen(true);
+    clearTimeout(liveFlash);
+    liveFlash = setTimeout(() => setLiveOpen(false), cls === "off" ? 5000 : 2600);
+  }
+}
+
+function setLiveOpen(open) {
+  els.live.classList.toggle("open", open);
+  els.liveBtn.setAttribute("aria-expanded", String(open));
 }
 
 function setPlaying(on) {
@@ -863,7 +969,7 @@ function setStatus(text, win) {
 setInterval(() => {
   if (state.mode !== "spotify" || !state.lastPoll) return;
   const age = Math.round((Date.now() - state.lastPoll) / 1000);
-  if (age > 15) setConn("off", "stale · " + age + "s");
+  if (age > 15) setConn("wait", "stale · last heard " + age + "s ago");
   else setConn("on", (state.userName ? "live: " + state.userName : "live") + " · " + age + "s");
 }, 1000);
 
@@ -919,11 +1025,49 @@ function setProgress(elapsed, total) {
   els.tTotal.textContent = fmt(total);
 }
 
+// the streak in flames: one lights (with a pop) per song in a row, up to five; a broken streak fizzles out
+const FLAMES = 5;
+const SVGNS = "http://www.w3.org/2000/svg";
+let shownStreak = 0;
+
+function renderFlames() {
+  const box = $("flames");
+  if (!box) return;
+  if (!box.children.length) {
+    for (let i = 0; i < FLAMES; i++) {
+      const svg = document.createElementNS(SVGNS, "svg");
+      svg.setAttribute("class", "flame");
+      svg.setAttribute("viewBox", "0 0 24 30");
+      const use = document.createElementNS(SVGNS, "use");
+      use.setAttribute("href", "#flameShape");
+      svg.append(use);
+      box.append(svg);
+    }
+  }
+  const lit = Math.min(state.streak, FLAMES), was = Math.min(shownStreak, FLAMES);
+  [...box.children].forEach((f, i) => {
+    const on = i < lit;
+    if (on && i >= was) {
+      f.setAttribute("class", "flame lit pop");
+      f.addEventListener("animationend", () => f.classList.remove("pop"), { once: true });
+    } else if (!on && i < was) {
+      f.setAttribute("class", "flame out");
+      f.addEventListener("animationend", () => { if (!f.classList.contains("lit")) f.setAttribute("class", "flame"); }, { once: true });
+    } else if (!f.classList.contains("out")) {
+      f.setAttribute("class", on ? "flame lit" : "flame");
+    }
+  });
+  shownStreak = state.streak;
+}
+
 function updateScore() {
   els.sPoints.textContent = state.points;
-  els.sStreak.textContent = state.streak >= 3 ? "🔥" + state.streak : state.streak;
+  els.sStreak.textContent = state.streak;
   els.sRounds.textContent = state.rounds;
   els.stStreak.classList.toggle("hot", state.streak >= 3);
+  els.stStreak.classList.toggle("blaze", state.streak >= FLAMES);
+  els.stStreak.setAttribute("aria-label", "Streak: " + state.streak + " in a row");
+  renderFlames();
   renderPlayers();
 }
 
@@ -1921,9 +2065,10 @@ async function togglePip() {
       pipWindow.document.head.appendChild(link);
     }
   }
-  pipWindow.document.body.append(els.app, els.radarScrim, els.modes, els.radar);
+  pipWindow.document.body.append(els.live, els.app, els.radarScrim, els.modes, els.radar);
   pipWindow.document.addEventListener("keydown", radarEscape);
   pipWindow.addEventListener("pagehide", () => {
+    els.shell.prepend(els.live);
     els.shell.append(els.app, els.radarScrim, els.modes, els.radar);
   });
 }
@@ -1945,6 +2090,9 @@ els.reconnect.onclick = async () => {
   if ("documentPictureInPicture" in window && documentPictureInPicture.window) documentPictureInPicture.window.close();
   await redirectToSpotify();
 };
+els.liveBtn.onclick = () => { clearTimeout(liveFlash); setLiveOpen(!els.live.classList.contains("open")); };
+document.addEventListener("pointerdown", (e) => { if (!els.live.contains(e.target)) setLiveOpen(false); });
+
 els.vsBtn.onclick = () => {
   const was = activeGame();
   morph(els.app, appKids, () => setVersus(!vs.on));
@@ -3275,6 +3423,7 @@ applyInputUI();
 renderModeBtn();
 renderHeardle();
 renderTimeline();
+renderFlames();
 
 // ---------- release radar: the newest albums and singles from the artists you play most ----------
 const RADAR_SCOPES = ["user-top-read"];
