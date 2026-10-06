@@ -3415,10 +3415,25 @@ async function playRelease(r, btn) {
   setTimeout(() => { radar.flash = ""; renderRadar(); }, 4000);
 }
 
+// the shell (and so the card) is moved by bubbleMotion only: shifting it here first made the card jump
+// instead of float. While the radar fills up, the bubble grows smoothly instead of in steps
 function renderRadar() {
-  syncBubbles();
   els.radarBtn.setAttribute("aria-expanded", String(radar.open));
   if (!radar.open) return;
+  const bubble = els.radar;
+  const settled = bubble.classList.contains("show") && !bubble.getAnimations().some((a) => a.id === "bubble");
+  const h0 = settled ? bubble.getBoundingClientRect().height : 0; // mid-grow height counts
+  bubble.getAnimations().forEach((a) => { if (a.id === "grow") a.cancel(); });
+  renderRadarContent();
+  if (!settled || reduceMotion.matches) return;
+  const h1 = bubble.getBoundingClientRect().height;
+  if (Math.abs(h1 - h0) > 1) {
+    const a = bubble.animate([{ height: h0 + "px" }, { height: h1 + "px" }], { duration: 420, easing: MORPH_EASE });
+    a.id = "grow";
+  }
+}
+
+function renderRadarContent() {
   const allowed = radarScopeOk();
   els.radarLogin.hidden = allowed && !/log in again/.test(radar.error);
   els.radarRefresh.disabled = radar.loading || !allowed;
