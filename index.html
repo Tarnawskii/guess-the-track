@@ -448,7 +448,7 @@
     </div>
     <div id="radarList"></div>
     <div id="radarNote"></div>
-    <button id="radarLogin" type="button" hidden>Let Spotify show who you follow</button>
+    <button id="radarLogin" type="button" hidden>Let Spotify show who you play most</button>
   </div>
   <div class="stage" id="stage">
     <div class="deck">
@@ -492,7 +492,7 @@
 const CONFIG = {
   spotifyClientId: "fb91c824fe804c50a8b4b244288ebc6f",
   redirectUri: location.origin + location.pathname,
-  scopes: "user-read-currently-playing user-read-playback-state user-modify-playback-state user-follow-read user-top-read",
+  scopes: "user-read-currently-playing user-read-playback-state user-modify-playback-state user-top-read",
   pollMs: 5000,
 };
 
@@ -2392,10 +2392,9 @@ els.lobbyRefresh.onclick = scanRooms;
 els.lobbyClose.onclick = () => setLobbyOpen(false);
 els.lobbyLogin.onclick = () => { location.href = location.pathname; };
 
-// ---------- release radar: the newest albums and singles from the artists you follow and play most ----------
-const RADAR_SCOPES = ["user-follow-read", "user-top-read"];
+// ---------- release radar: the newest albums and singles from the artists you play most ----------
+const RADAR_SCOPES = ["user-top-read"];
 const RADAR_MAX_DAYS = 90;      // fetched once, the Week/Month/3 months tabs just filter
-const RADAR_MAX_ARTISTS = 400;
 const RADAR_TTL = 6 * 3600e3;   // cached this long, Refresh skips it
 const radar = { open: false, loading: false, done: 0, total: 0, artists: 0, failed: 0, releases: [], at: 0, error: "", flash: "", days: 30, since: "" };
 let radarRenderTimer = 0;
@@ -2436,21 +2435,10 @@ async function spotifyJson(url) {
   }
 }
 
+// your 50 most played artists over the last ~6 months (Spotify's "medium_term")
 async function radarArtists() {
-  const ids = new Set();
-  let url = "https://api.spotify.com/v1/me/following?type=artist&limit=50";
-  while (url && ids.size < RADAR_MAX_ARTISTS) {
-    const d = await spotifyJson(url);
-    d.artists.items.forEach((a) => ids.add(a.id));
-    url = d.artists.next;
-  }
-  // plenty of people never hit Follow, so add the artists they actually play most too
-  for (const range of ["short_term", "medium_term"]) {
-    try {
-      (await spotifyJson("https://api.spotify.com/v1/me/top/artists?limit=50&time_range=" + range)).items.forEach((a) => ids.add(a.id));
-    } catch {}
-  }
-  return [...ids].slice(0, RADAR_MAX_ARTISTS);
+  const d = await spotifyJson("https://api.spotify.com/v1/me/top/artists?limit=50&time_range=medium_term");
+  return d.items.map((a) => a.id);
 }
 
 // newest first within each group, so a handful per group always holds anything recent
@@ -2486,7 +2474,7 @@ function dedupeReleases(list) {
 }
 
 function readRadarCache() {
-  try { return JSON.parse(localStorage.getItem("gtt_radar")) || null; } catch { return null; }
+  try { return JSON.parse(localStorage.getItem("gtt_radar_v2")) || null; } catch { return null; }
 }
 
 async function loadRadar(force) {
@@ -2517,11 +2505,11 @@ async function loadRadar(force) {
     radar.artists = ids.length;
     radar.at = Date.now();
     if (ids.length && radar.failed === ids.length) radar.error = "couldn't reach Spotify — hit Refresh";
-    else try { localStorage.setItem("gtt_radar", JSON.stringify({ at: radar.at, artists: radar.artists, releases: radar.releases })); } catch {}
+    else try { localStorage.setItem("gtt_radar_v2", JSON.stringify({ at: radar.at, artists: radar.artists, releases: radar.releases })); } catch {}
   } catch (e) {
     console.error("[gtt] radar failed", e);
     radar.error = e.status === 401 || e.status === 403 ? "Spotify said no — log in again below" : e.message;
-    if (e.status === 401 || e.status === 403) try { localStorage.removeItem("gtt_radar"); } catch {}
+    if (e.status === 401 || e.status === 403) try { localStorage.removeItem("gtt_radar_v2"); } catch {}
   }
   radar.loading = false;
   renderRadar();
@@ -2586,11 +2574,11 @@ function renderRadar() {
     return row;
   }));
   const span = radar.days === 7 ? "this week" : radar.days === 30 ? "this month" : "in 3 months";
-  els.radarNote.textContent = !allowed ? "Spotify has to let the app see which artists you follow — one quick login"
+  els.radarNote.textContent = !allowed ? "Spotify has to let the app see which artists you play most — one quick login"
     : radar.flash ? radar.flash
-    : radar.loading ? "checking " + (radar.total ? radar.done + "/" + radar.total + " artists" : "who you follow") + "…"
+    : radar.loading ? "checking " + (radar.total ? radar.done + "/" + radar.total + " artists" : "who you play most") + "…"
     : radar.error ? radar.error
-    : !radar.artists ? "follow some artists in Spotify (or play some) and they'll show up here"
+    : !radar.artists ? "Spotify doesn't know your favourites yet — play some music and check back"
     : list.length ? list.length + (list.length === 1 ? " release" : " releases") + " from " + radar.artists + " artists" + (radar.failed ? " · " + radar.failed + " couldn't be checked" : "")
     : "nothing new from your " + radar.artists + " artists " + span + (radar.days < 90 ? " — try a longer stretch" : "");
 }
