@@ -244,13 +244,50 @@
   }
   #radarBtn[aria-pressed="true"] { color: var(--mustard); }
   #app.guest #radarBtn, #app.lobby #radarBtn { display: none; }
+  /* the radar is a bubble that slides out from behind the card; on narrow screens it rises as a bottom sheet */
+  #shell { position: relative; width: 100%; max-width: 21.25rem; transition: transform 520ms var(--ease-out); }
+  #shell > #app { z-index: 1; }
+  #shell.radar-open { transform: translateX(-9.625rem); }
   #radar {
-    display: none; flex-direction: column; gap: 0.375rem; padding: 0.5rem; border-radius: 0.875rem;
-    background: rgba(0, 0, 0, 0.3); border: 1px solid var(--hairline);
+    position: absolute; z-index: 0; top: 4.75rem; left: calc(100% - 1.75rem); width: 21rem; max-height: calc(100% - 5.75rem);
+    display: flex; flex-direction: column; gap: 0.5rem; padding: 0.875rem 0.875rem 0.875rem 2.5rem;
+    background: radial-gradient(18rem 12rem at 100% 0%, rgba(255, 79, 129, 0.2), transparent 70%), radial-gradient(14rem 10rem at 30% 110%, rgba(255, 194, 61, 0.1), transparent 70%), #21121a;
+    border: 1px solid var(--hairline); border-radius: 1.5rem;
+    box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transform-origin: 0 1.5rem;
+    transform: translateX(-90%) scale(0.92); opacity: 0; visibility: hidden; pointer-events: none;
+    transition: transform 380ms var(--ease-out), opacity 240ms var(--ease) 80ms, visibility 0s linear 380ms;
   }
-  #radar.show { display: flex; }
+  #radar.show {
+    transform: none; opacity: 1; visibility: visible; pointer-events: auto;
+    transition: transform 620ms var(--ease-back), opacity 160ms var(--ease), visibility 0s;
+  }
+  #radar .lobby-head span {
+    font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; letter-spacing: 0; text-transform: none; color: var(--cream); padding-left: 0;
+    text-shadow: 1px 1px 0 var(--orange), 2px 2px 0 var(--pink);
+  }
   #radar .seg button { min-height: 2rem; font-size: 0.6875rem; }
-  #radarList { display: grid; gap: 0.3125rem; max-height: 18rem; overflow-y: auto; overscroll-behavior: contain; }
+  #radarList { display: grid; gap: 0.3125rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #radarScrim { display: none; }
+  .rel.in { animation: rel-in 460ms var(--ease-out) both; animation-delay: calc(var(--i) * 45ms + 120ms); }
+  @keyframes rel-in { from { opacity: 0; transform: translateX(-1rem) scale(0.96); } }
+  @media (max-width: 47.99rem) {
+    #shell.radar-open { transform: none; }
+    #radar {
+      position: fixed; z-index: 20; top: auto; left: 0.75rem; right: 0.75rem; bottom: 0.75rem; width: auto; max-width: 24rem; margin: 0 auto;
+      max-height: min(78vh, 36rem); padding: 0.875rem;
+      transform-origin: 50% 100%; transform: translateY(calc(100% + 1.5rem)) scale(0.96); opacity: 1;
+      transition: transform 340ms var(--ease-out), visibility 0s linear 340ms;
+    }
+    #radar.show { transition: transform 560ms var(--ease-back), visibility 0s; }
+    #radarScrim {
+      display: block; position: fixed; inset: 0; z-index: 19; background: rgba(10, 4, 8, 0.6);
+      opacity: 0; visibility: hidden; transition: opacity 300ms var(--ease), visibility 0s linear 300ms;
+    }
+    #radarScrim.show { opacity: 1; visibility: visible; transition: opacity 300ms var(--ease), visibility 0s; }
+    .rel.in { animation-name: rel-up; }
+    @keyframes rel-up { from { opacity: 0; transform: translateY(0.75rem) scale(0.97); } }
+  }
   .rel { display: grid; grid-template-columns: 2.75rem 1fr auto; align-items: center; gap: 0.5rem; padding: 0.3125rem; border-radius: 0.625rem; background: var(--fill); }
   .rel img { width: 2.75rem; height: 2.75rem; border-radius: 0.375rem; object-fit: cover; background: var(--fill2); }
   .rel div { min-width: 0; display: grid; line-height: 1.25; }
@@ -406,10 +443,16 @@
     .confetti { display: none; }
     .cover-inner, .record, .field .v, .disc-label { transition: none; }
     button:active { transform: none; }
+    #shell, #radar, #radar.show { transition: opacity 200ms var(--ease), visibility 0s linear 200ms; }
+    #radar, #radar.show { transform: none !important; }
+    #radar:not(.show) { opacity: 0; }
+    #radar.show { transition: opacity 200ms var(--ease), visibility 0s; }
+    .rel.in { animation: none; }
   }
 </style>
 </head>
 <body>
+<div id="shell">
 <div id="app">
   <div class="lava" aria-hidden="true"><i></i><i></i><i></i></div>
   <header>
@@ -438,17 +481,6 @@
     <div id="lobbyList"></div>
     <div id="lobbyNote"></div>
     <button id="lobbyLogin" type="button" hidden>Log in with Spotify to host your own</button>
-  </div>
-  <div id="radar" aria-live="polite">
-    <div class="lobby-head"><span>Release radar</span><button id="radarRefresh" type="button">Refresh</button><button id="radarClose" type="button" aria-label="Close release radar">✕</button></div>
-    <div class="seg" id="radarSeg" role="group" aria-label="How far back">
-      <button data-range="7" aria-pressed="false">Week</button>
-      <button data-range="30" aria-pressed="true">Month</button>
-      <button data-range="90" aria-pressed="false">3 months</button>
-    </div>
-    <div id="radarList"></div>
-    <div id="radarNote"></div>
-    <button id="radarLogin" type="button" hidden>Let Spotify show who you play most</button>
   </div>
   <div class="stage" id="stage">
     <div class="deck">
@@ -487,6 +519,19 @@
   <div id="answer"></div>
   <div id="vsResult" aria-live="polite"></div>
   <footer><span class="solo-only"><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</span><span class="vs-only">one shot each · <kbd>Ctrl ⏎</kbd> lock in · song ends = time's up</span></footer>
+</div>
+<div id="radarScrim" aria-hidden="true"></div>
+  <div id="radar" role="dialog" aria-label="Release radar" aria-live="polite">
+    <div class="lobby-head"><span>Release radar</span><button id="radarRefresh" type="button">Refresh</button><button id="radarClose" type="button" aria-label="Close release radar">✕</button></div>
+    <div class="seg" id="radarSeg" role="group" aria-label="How far back">
+      <button data-range="7" aria-pressed="false">Week</button>
+      <button data-range="30" aria-pressed="true">Month</button>
+      <button data-range="90" aria-pressed="false">3 months</button>
+    </div>
+    <div id="radarList"></div>
+    <div id="radarNote"></div>
+    <button id="radarLogin" type="button" hidden>Let Spotify show who you play most</button>
+  </div>
 </div>
 <script>
 const CONFIG = {
@@ -582,7 +627,7 @@ const els = {
   roomsBtn: $("roomsBtn"), lobby: $("lobby"), lobbyList: $("lobbyList"), lobbyNote: $("lobbyNote"),
   lobbyRefresh: $("lobbyRefresh"), lobbyClose: $("lobbyClose"), lobbyLogin: $("lobbyLogin"),
   radarBtn: $("radarBtn"), radar: $("radar"), radarList: $("radarList"), radarNote: $("radarNote"),
-  radarRefresh: $("radarRefresh"), radarClose: $("radarClose"), radarLogin: $("radarLogin"),
+  shell: $("shell"), radarScrim: $("radarScrim"), radarRefresh: $("radarRefresh"), radarClose: $("radarClose"), radarLogin: $("radarLogin"),
   radarSeg: $("radarSeg"), radarRanges: document.querySelectorAll("[data-range]"),
   net: $("net"), netLed: $("netLed"), netText: $("netText"), netInvite: $("netInvite"), netBtn: $("netBtn"),
 };
@@ -1643,9 +1688,10 @@ async function togglePip() {
       pipWindow.document.head.appendChild(link);
     }
   }
-  pipWindow.document.body.appendChild(els.app);
+  pipWindow.document.body.append(els.app, els.radarScrim, els.radar);
+  pipWindow.document.addEventListener("keydown", radarEscape);
   pipWindow.addEventListener("pagehide", () => {
-    document.body.appendChild(els.app);
+    els.shell.append(els.app, els.radarScrim, els.radar);
   });
 }
 els.pipBtn.onclick = togglePip;
@@ -2396,7 +2442,7 @@ els.lobbyLogin.onclick = () => { location.href = location.pathname; };
 const RADAR_SCOPES = ["user-top-read"];
 const RADAR_MAX_DAYS = 90;      // fetched once, the Week/Month/3 months tabs just filter
 const RADAR_TTL = 6 * 3600e3;   // cached this long, Refresh skips it
-const radar = { open: false, loading: false, done: 0, total: 0, artists: 0, failed: 0, releases: [], at: 0, error: "", flash: "", days: 30, since: "" };
+const radar = { open: false, loading: false, done: 0, total: 0, artists: 0, failed: 0, releases: [], at: 0, error: "", flash: "", days: 30, since: "", shown: new Set() };
 let radarRenderTimer = 0;
 
 function radarScopeOk() {
@@ -2533,6 +2579,8 @@ async function playRelease(r, btn) {
 
 function renderRadar() {
   els.radar.classList.toggle("show", radar.open);
+  els.radarScrim.classList.toggle("show", radar.open);
+  els.shell.classList.toggle("radar-open", radar.open);
   els.radarBtn.setAttribute("aria-pressed", String(radar.open));
   if (!radar.open) return;
   const allowed = radarScopeOk();
@@ -2542,9 +2590,16 @@ function renderRadar() {
   els.radarRanges.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.range) === radar.days)));
   const cutoff = isoDay(radar.days);
   const list = allowed ? radar.releases.filter((r) => r.date >= cutoff) : [];
+  let fresh = 0;
   els.radarList.replaceChildren(...list.map((r) => {
     const row = document.createElement("div");
     row.className = "rel";
+    // rows slide in one after another the first time they show up, not on every progress repaint
+    if (!radar.shown.has(r.id)) {
+      radar.shown.add(r.id);
+      row.classList.add("in");
+      row.style.setProperty("--i", Math.min(fresh++, 12));
+    }
     const img = document.createElement("img");
     img.alt = ""; img.loading = "lazy"; img.decoding = "async";
     if (r.img) img.src = r.img;
@@ -2585,6 +2640,7 @@ function renderRadar() {
 
 function setRadarOpen(open) {
   radar.open = open;
+  radar.shown.clear();
   if (open) {
     // NEW = released since the last day you looked, kept for the rest of today
     let visit = {};
@@ -2600,7 +2656,12 @@ function setRadarOpen(open) {
 els.radarBtn.onclick = () => setRadarOpen(!radar.open);
 els.radarClose.onclick = () => setRadarOpen(false);
 els.radarRefresh.onclick = () => loadRadar(true);
-els.radarRanges.forEach((b) => { b.onclick = () => { radar.days = Number(b.dataset.range); renderRadar(); }; });
+els.radarRanges.forEach((b) => { b.onclick = () => { radar.days = Number(b.dataset.range); radar.shown.clear(); renderRadar(); }; });
+els.radarScrim.onclick = () => setRadarOpen(false);
+function radarEscape(e) {
+  if (e.key === "Escape" && radar.open) setRadarOpen(false);
+}
+document.addEventListener("keydown", radarEscape);
 // the new permissions need a fresh login, which goes through reconnect's "scores will reset" guard
 els.radarLogin.onclick = () => { sessionStorage.setItem("gtt_radar_login", "1"); els.reconnect.onclick(); };
 
