@@ -730,6 +730,7 @@
   }
   .tv-screen {
     position: relative; aspect-ratio: 4 / 3; overflow: hidden; isolation: isolate; border-radius: 9% / 12%;
+    clip-path: inset(0 round 9% / 12%); /* filtered layers (the cover, the bloom) can escape a plain overflow clip at the corners */
     background: radial-gradient(ellipse at 50% 45%, #1a3027, #0d1a14 68%, #070e0b); color: #d6ffe6; font-size: 5cqw; line-height: 1.05;
     box-shadow: inset 0 0 6cqw rgba(0, 0, 0, 0.9);
     text-shadow: 0 0 0.7cqw currentColor, 0.22cqw 0 0 rgba(255, 30, 80, 0.35), -0.22cqw 0 0 rgba(0, 170, 255, 0.35);
@@ -819,12 +820,16 @@
     background: radial-gradient(ellipse at 50% 42%, var(--c1, #1a2a22) 0%, var(--c2, #0b1410) 62%, #030605 100%);
     transition: background 600ms var(--ease);
   }
-  .cover-slot { width: 44cqw; aspect-ratio: 1; flex: none; }
+  /* CH4: the cover fills the whole screen (cropped top and bottom to the 4:3 tube), under the CRT layers */
+  .tv[data-ch="4"] #tvArt.has { left: 0 !important; top: 0 !important; width: 100% !important; height: 100%; aspect-ratio: auto; border-radius: 0; }
   .cover-cap {
-    max-width: 100%; padding: 0.3cqw 1.8cqw; border-radius: 0.6cqw; background: rgba(0, 0, 0, 0.6);
-    font-size: 5cqw; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    position: absolute; z-index: 5; left: 50%; bottom: 7%; max-width: 84%; translate: -50% 0;
+    padding: 0.4cqw 2cqw; border-radius: 0.6cqw; background: rgba(0, 0, 0, 0.72);
+    font-size: 5.2cqw; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    opacity: 0; transition: opacity 700ms var(--ease);
   }
-  .tv[data-ch="4"] .tv-osd { top: auto; bottom: 3.5cqw; }
+  .cover-cap.show { opacity: 1; transition: opacity 250ms var(--ease); }
+  .tv[data-ch="4"] .tv-osd { z-index: 6; }
   .cover-cap em { font-style: normal; color: #7ff6ff; }
   .tv-screen.power-on #tvArt, .tv-screen.power-off #tvArt, .tv-screen.snowing #tvArt { opacity: 0; transition: none; }
   .vhs-bottom a { color: #1ed760; text-decoration: none; font-size: 4.6cqw; }
@@ -4374,7 +4379,8 @@ function tvRenderNow(force) {
 
 // the cover lives outside the effects layer, over the empty slot CH1 leaves for it
 function tvPlaceArt() {
-  const slot = tv.ch === 4 ? T.cover.querySelector(".cover-slot") : T.now.querySelector(".now-slot");
+  if (tv.ch === 4) return; // CSS stretches it over the whole screen there
+  const slot = T.now.querySelector(".now-slot");
   if (!slot || !T.screen.clientWidth) return;
   // in % of the screen, so it stays put when the pop-out window is resized
   const w = T.screen.clientWidth, h = T.screen.clientHeight;
@@ -4391,11 +4397,13 @@ function tvRenderCover(force) {
   if (force || box.dataset.view !== "cover:" + tv.key) {
     box.dataset.view = "cover:" + tv.key;
     box.dataset.colors = "";
-    const cap = el("div", "cover-cap");
+    const cap = el("div", "cover-cap show");
     cap.append(t.song + "  ", el("em", "", t.artists.join(", ")));
-    box.replaceChildren(el("div", "cover-slot"), cap);
+    box.replaceChildren(cap);
     if (t.artUrl) { T.art.src = t.artUrl; T.art.classList.add("has"); } else T.art.classList.remove("has");
-    tvPlaceArt();
+    // a lower third for the new song, then the whole screen is the cover
+    clearTimeout(tv.capTimer);
+    tv.capTimer = setTimeout(() => cap.classList.remove("show"), 4500);
   }
   const cols = state.colors && state.colors.key === tv.key ? state.colors.colors : null;
   if (box.dataset.colors !== String(cols)) {
@@ -4614,7 +4622,7 @@ function drawTvFrame() {
   const ctx = vpip.ctx;
   if (!ctx) return;
   const t = state.track;
-  if (state.trackKey !== vpip.key) { if (vpip.key !== null) vpip.snow = 4; vpip.key = state.trackKey; vpipMeta(); }
+  if (state.trackKey !== vpip.key) { if (vpip.key !== null) vpip.snow = 4; vpip.key = state.trackKey; vpip.keyAt = Date.now(); vpipMeta(); }
   ctx.fillStyle = "#0c090b";
   ctx.fillRect(0, 0, VW, VH);
   // cabinet, feet, bezel
@@ -4639,6 +4647,19 @@ function drawTvFrame() {
     bars.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(S.x + (S.w / 7) * i, S.y, S.w / 7 + 1, S.h * 0.8); });
     ctx.fillStyle = "#000"; ctx.fillRect(S.x + S.w / 2 - 110, S.y + S.h * 0.36, 220, 46);
     vpipText(ctx, "NO SIGNAL", S.x + S.w / 2 - 80, S.y + S.h * 0.36 + 34, 36, "#fff", 200);
+  } else if (tv.ch === 4 && vpipImage(t.artUrl)) {
+    // CH4: the cover over the whole screen, cropped to 4:3, with a lower third for the first seconds of a song
+    const art = vpipImage(t.artUrl);
+    const sw = art.naturalWidth, sh = sw * (S.h / S.w);
+    ctx.drawImage(art, 0, (art.naturalHeight - sh) / 2, sw, sh, S.x, S.y, S.w, S.h);
+    if (Date.now() - (vpip.keyAt || 0) < 4500) {
+      ctx.font = "30px VT323, ui-monospace, Menlo, monospace";
+      const label = t.song + "  " + t.artists.join(", ");
+      const w = Math.min(S.w * 0.84, ctx.measureText(label).width + 28);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+      rrect(ctx, S.x + (S.w - w) / 2, S.y + S.h * 0.8, w, 40, 6); ctx.fill();
+      vpipText(ctx, label, S.x + (S.w - w) / 2 + 14, S.y + S.h * 0.8 + 30, 30, "#ffffff", w - 28);
+    }
   } else {
     const playing = els.stage.classList.contains("playing");
     vpipText(ctx, playing ? "▶ PLAY" : "❚❚ PAUSE", S.x + 34, S.y + 50, 30, "#ffffff", 200);
