@@ -734,19 +734,40 @@
     box-shadow: inset 0 0 6cqw rgba(0, 0, 0, 0.9);
     text-shadow: 0 0 0.7cqw currentColor, 0.22cqw 0 0 rgba(255, 30, 80, 0.35), -0.22cqw 0 0 rgba(0, 170, 255, 0.35);
   }
-  .tv-screen::before {
-    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
-    background:
-      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 3px),
-      repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.045) 0 1px, rgba(0, 255, 0, 0.035) 1px 2px, rgba(0, 0, 255, 0.045) 2px 3px);
+  /* the CRT, layer by layer: bloom lets bright parts bleed over the gaps, soft beam lines sized to the screen
+     (~200 of them, never finer than 3px so they don't shimmer), an RGB aperture grille, and a slow rolling band */
+  .tv-screen { --line: max(3px, 0.32cqw); --grille: max(3px, 0.36cqw); }
+  .crt-bloom, .crt-lines, .crt-grille, .crt-roll { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+  .crt-bloom {
+    z-index: 5; mix-blend-mode: screen; opacity: 0.4;
+    -webkit-backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2); backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2);
   }
+  .crt-lines {
+    z-index: 6; mix-blend-mode: multiply;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(110, 110, 110, 1) 50%, rgba(255, 255, 255, 1) 100%) 0 0 / 100% var(--line) repeat;
+    opacity: 0.6;
+  }
+  .crt-grille {
+    z-index: 6; mix-blend-mode: multiply; opacity: 0.16;
+    background: linear-gradient(90deg, #ff4040 0 33.3%, #40ff60 33.3% 66.6%, #4060ff 66.6%) 0 0 / var(--grille) 100% repeat;
+  }
+  .crt-roll {
+    z-index: 7; mix-blend-mode: screen; opacity: 0.5;
+    background: linear-gradient(180deg, transparent 0%, rgba(200, 255, 220, 0.05) 40%, rgba(200, 255, 220, 0.09) 50%, rgba(200, 255, 220, 0.05) 60%, transparent 100%) 0 0 / 100% 35% no-repeat;
+    animation: crt-roll 9s linear infinite;
+  }
+  @keyframes crt-roll { from { background-position: 0 -40%; } to { background-position: 0 160%; } }
+  .tv.strong .crt-lines { opacity: 0.85; animation: crt-interlace 0.067s steps(1) infinite; }
+  .tv.strong .crt-grille { opacity: 0.26; }
+  .tv.strong .crt-roll { opacity: 1; animation-duration: 5s; }
+  .tv.strong .crt-bloom { opacity: 0.5; }
+  @keyframes crt-interlace { 50% { background-position: 0 calc(var(--line) / 2); } }
   .tv-screen::after {
-    content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+    content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
     background:
       radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.6) 100%),
       linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 22%, transparent 34%);
   }
-  .tv.strong .tv-screen::before { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.08) 0 1px, rgba(0, 255, 0, 0.06) 1px 2px, rgba(0, 0, 255, 0.08) 2px 3px); }
   .tv.strong .tv-content { animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite; }
   .tv.strong .tv-screen { text-shadow: 0 0 1cqw currentColor, 0.45cqw 0 0 rgba(255, 30, 80, 0.45), -0.45cqw 0 0 rgba(0, 170, 255, 0.45); }
   @keyframes tv-flicker { 50% { opacity: 0.94; } }
@@ -767,7 +788,7 @@
   .tv-static { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; opacity: 0; pointer-events: none; image-rendering: pixelated; transition: opacity 260ms var(--ease); }
   .tv-static.burst { opacity: 0.9; transition: none; }
   .tv-osd {
-    position: absolute; z-index: 6; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
+    position: absolute; z-index: 4; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
     color: #4dff86; font-size: 6.5cqw; letter-spacing: 0.06em;
     opacity: 0; transition: opacity 500ms var(--ease);
   }
@@ -889,7 +910,7 @@
     .flame.out { animation: none; opacity: 0; }
     .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
     #cover.flipped .cover-back img, #ambient i { animation: none; }
-    .tv .tv-content, .tv.strong .tv-content, .tv.strong #tvArt, .vhs-top .pause { animation: none; }
+    .tv .tv-content, .tv.strong .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
     button:active { transform: none; }
     .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
   }
@@ -1052,6 +1073,7 @@
           <img id="tvArt" alt="" />
           <canvas class="tv-static" id="tvStatic" width="120" height="90"></canvas>
           <div class="tv-osd" id="tvOsd"></div>
+          <div class="crt-bloom"></div><div class="crt-lines"></div><div class="crt-grille"></div><div class="crt-roll"></div>
         </div>
         <span class="tv-brand">GROOVTRON</span>
       </div>
