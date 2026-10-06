@@ -244,50 +244,134 @@
   }
   #radarBtn[aria-pressed="true"] { color: var(--mustard); }
   #app.guest #radarBtn, #app.lobby #radarBtn { display: none; }
-  /* the radar is a bubble that slides out from behind the card; on narrow screens it rises as a bottom sheet */
+  /* bubbles slide out from behind the card: modes on the left, the radar on the right; on narrow screens they rise as bottom sheets */
   #shell { position: relative; width: 100%; max-width: 21.25rem; transition: transform 520ms var(--ease-out); }
   #shell > #app { z-index: 1; }
   #shell.radar-open { transform: translateX(-9.625rem); }
-  #radar {
-    position: absolute; z-index: 0; top: 4.75rem; left: calc(100% - 1.75rem); width: 21rem; max-height: calc(100% - 5.75rem);
-    display: flex; flex-direction: column; gap: 0.5rem; padding: 0.875rem 0.875rem 0.875rem 2.5rem;
+  #shell.modes-open { transform: translateX(9.625rem); }
+  #shell.radar-open.modes-open { transform: none; }
+  .bubble {
+    position: absolute; z-index: 0; width: 21rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
     background: radial-gradient(18rem 12rem at 100% 0%, rgba(255, 79, 129, 0.2), transparent 70%), radial-gradient(14rem 10rem at 30% 110%, rgba(255, 194, 61, 0.1), transparent 70%), #21121a;
     border: 1px solid var(--hairline); border-radius: 1.5rem;
     box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    transform-origin: 0 1.5rem;
-    transform: translateX(-90%) scale(0.92); opacity: 0; visibility: hidden; pointer-events: none;
+    opacity: 0; visibility: hidden; pointer-events: none;
     transition: transform 380ms var(--ease-out), opacity 240ms var(--ease) 80ms, visibility 0s linear 380ms;
   }
-  #radar.show {
+  .bubble.show {
     transform: none; opacity: 1; visibility: visible; pointer-events: auto;
     transition: transform 620ms var(--ease-back), opacity 160ms var(--ease), visibility 0s;
   }
-  #radar .lobby-head span {
+  .bubble [hidden] { display: none; }
+  .bubble .lobby-head span {
     font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; letter-spacing: 0; text-transform: none; color: var(--cream); padding-left: 0;
     text-shadow: 1px 1px 0 var(--orange), 2px 2px 0 var(--pink);
   }
-  #radar .seg button { min-height: 2rem; font-size: 0.6875rem; }
+  .bubble .seg button { min-height: 2rem; font-size: 0.6875rem; }
+  #radar {
+    top: 4.75rem; left: calc(100% - 1.75rem); max-height: calc(100% - 5.75rem); padding: 0.875rem 0.875rem 0.875rem 2.5rem;
+    transform-origin: 0 1.5rem; transform: translateX(-90%) scale(0.92);
+  }
+  #modes {
+    top: 3.5rem; right: calc(100% - 1.75rem); max-height: calc(100% - 4.5rem); padding: 0.875rem 2.5rem 0.875rem 0.875rem;
+    transform-origin: 100% 1.5rem; transform: translateX(90%) scale(0.92);
+    background: radial-gradient(18rem 12rem at 0% 0%, rgba(255, 194, 61, 0.16), transparent 70%), radial-gradient(14rem 10rem at 70% 110%, rgba(123, 45, 107, 0.35), transparent 70%), #21121a;
+  }
+  #radar.show, #modes.show { transform: none; }
   #radarList { display: grid; gap: 0.3125rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #modesBody { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   #radarScrim { display: none; }
-  .rel.in { animation: rel-in 460ms var(--ease-out) both; animation-delay: calc(var(--i) * 45ms + 120ms); }
+  .rel.in, .mode-card.in { animation: rel-in 460ms var(--ease-out) both; animation-delay: calc(var(--i) * 45ms + 120ms); }
+  .mode-card.in { animation-name: mode-in; }
   @keyframes rel-in { from { opacity: 0; transform: translateX(-1rem) scale(0.96); } }
+  @keyframes mode-in { from { opacity: 0; transform: translateX(1rem) scale(0.96); } }
   @media (max-width: 47.99rem) {
-    #shell.radar-open { transform: none; }
-    #radar {
+    #shell.radar-open, #shell.modes-open { transform: none; }
+    .bubble, #radar, #modes {
       position: fixed; z-index: 20; top: auto; left: 0.75rem; right: 0.75rem; bottom: 0.75rem; width: auto; max-width: 24rem; margin: 0 auto;
       max-height: min(78vh, 36rem); padding: 0.875rem;
       transform-origin: 50% 100%; transform: translateY(calc(100% + 1.5rem)) scale(0.96); opacity: 1;
       transition: transform 340ms var(--ease-out), visibility 0s linear 340ms;
     }
-    #radar.show { transition: transform 560ms var(--ease-back), visibility 0s; }
+    #radar.show, #modes.show { transform: none; transition: transform 560ms var(--ease-back), visibility 0s; }
     #radarScrim {
       display: block; position: fixed; inset: 0; z-index: 19; background: rgba(10, 4, 8, 0.6);
       opacity: 0; visibility: hidden; transition: opacity 300ms var(--ease), visibility 0s linear 300ms;
     }
     #radarScrim.show { opacity: 1; visibility: visible; transition: opacity 300ms var(--ease), visibility 0s; }
-    .rel.in { animation-name: rel-up; }
+    .rel.in, .mode-card.in { animation-name: rel-up; }
     @keyframes rel-up { from { opacity: 0; transform: translateY(0.75rem) scale(0.97); } }
   }
+  /* mode button on the card + the cards inside the mode bubble */
+  #modeBtn {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.625rem; text-align: left;
+    min-height: 3rem; padding: 0 0.875rem 0 0.5rem; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+  #modeBtn[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--mustard); }
+  #modeBtn:disabled { opacity: 1; cursor: default; }
+  #modeIcon {
+    width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 50%; font-size: 1.0625rem;
+    background: linear-gradient(135deg, var(--mustard), var(--orange)); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.35);
+  }
+  #modeBtn span:nth-child(2) { display: grid; line-height: 1.2; min-width: 0; }
+  #modeName { font-size: 0.875rem; font-weight: 800; color: var(--cream); }
+  #modeDesc { font-size: 0.6875rem; font-weight: 600; color: var(--label2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #modeBtn > i { font-style: normal; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--mustard); }
+  #modeBtn:disabled > i { display: none; }
+  #modeList { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
+  .mode-card {
+    display: grid; justify-items: start; align-content: start; gap: 0.125rem; text-align: left; min-height: 5.25rem; padding: 0.625rem;
+    border-radius: 1rem; background: var(--fill); box-shadow: inset 0 0 0 1px transparent;
+  }
+  .mode-card i { font-style: normal; font-size: 1.25rem; line-height: 1.3; }
+  .mode-card b { font-size: 0.8125rem; color: var(--cream); }
+  .mode-card span { font-size: 0.625rem; font-weight: 600; line-height: 1.3; color: var(--label2); }
+  .mode-card[aria-checked="true"] {
+    background: linear-gradient(135deg, rgba(255, 194, 61, 0.22), rgba(255, 122, 47, 0.14)); box-shadow: inset 0 0 0 1.5px var(--mustard);
+  }
+  .mode-card:disabled { opacity: 0.45; }
+  .conf { display: grid; gap: 0.25rem; }
+  .conf > span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); padding-left: 0.25rem; }
+  #modesNote { font-size: 0.6875rem; font-weight: 600; color: var(--label3); text-align: center; line-height: 1.35; }
+  #modesNote:empty { display: none; }
+  #modesNew { min-height: 2.25rem; border-radius: 999px; font-size: 0.75rem; background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  /* Heardle: the year is out, a snippet ladder is in */
+  #heardle { display: none; flex-direction: column; gap: 0.375rem; }
+  #app.heardle #heardle { display: flex; }
+  #app.heardle #fYear, #app.heardle:not(.hd-both) #fArtist { display: none; }
+  #hdBar { position: relative; height: 0.625rem; border-radius: 999px; overflow: hidden; background: var(--fill); }
+  #hdOpen { position: absolute; inset: 0 auto 0 0; background: rgba(255, 194, 61, 0.22); transition: width 300ms var(--ease-out); }
+  #hdFill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--mustard), var(--orange), var(--pink)); }
+  #hdBar s { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--card); }
+  .hd-row { display: flex; align-items: center; gap: 0.375rem; }
+  #hdInfo { flex: 1; font-size: 0.6875rem; font-weight: 600; color: var(--label2); }
+  .hd-row button { min-height: 2.25rem; padding: 0 0.875rem; border-radius: 999px; font-size: 0.75rem; }
+  #hdPlay { background: linear-gradient(135deg, var(--mustard), var(--orange)); color: var(--ink); }
+  /* Hitster: place the song on your timeline */
+  #timeline { display: none; flex-direction: column; gap: 0.375rem; }
+  #app.hitster #timeline { display: flex; }
+  #app.hitster .field, #app.hitster #check, #app.hitster #reveal, #app.hitster #choices { display: none; }
+  #tlHead { display: flex; align-items: center; gap: 0.375rem; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--label2); }
+  #tlInfo { flex: 1; }
+  #tlNew { min-height: 2rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.6875rem; }
+  #tlCards { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3125rem; max-height: 12.5rem; overflow-y: auto; overscroll-behavior: contain; padding: 0.125rem; }
+  #tlCards .slot {
+    width: 2.25rem; min-height: 2.75rem; padding: 0; border-radius: 0.75rem; font-size: 1rem; color: var(--ink);
+    background: linear-gradient(135deg, var(--mustard), var(--orange)); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.3);
+  }
+  #tlCards .slot:disabled { background: transparent; box-shadow: none; width: 0.25rem; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
+  .tl-card {
+    display: grid; line-height: 1.15; min-height: 2.75rem; align-content: center; padding: 0.25rem 0.5rem; border-radius: 0.75rem;
+    background: var(--fill2); max-width: 6.5rem;
+  }
+  .tl-card b { font-family: var(--groovy); font-weight: 400; font-size: 0.9375rem; color: var(--cream); }
+  .tl-card span { font-size: 0.5625rem; font-weight: 600; color: var(--label2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-card.fresh { background: rgba(168, 224, 99, 0.18); box-shadow: inset 0 0 0 1.5px var(--ok); animation: tl-pop 520ms var(--ease-back); }
+  .tl-card.bad { background: rgba(255, 90, 79, 0.16); box-shadow: inset 0 0 0 1.5px var(--bad); animation: tl-pop 520ms var(--ease-back); }
+  .tl-card.bad b { color: var(--bad); text-decoration: line-through; }
+  @keyframes tl-pop { from { transform: scale(0.6); opacity: 0; } }
   .rel { display: grid; grid-template-columns: 2.75rem 1fr auto; align-items: center; gap: 0.5rem; padding: 0.3125rem; border-radius: 0.625rem; background: var(--fill); }
   .rel img { width: 2.75rem; height: 2.75rem; border-radius: 0.375rem; object-fit: cover; background: var(--fill2); }
   .rel div { min-width: 0; display: grid; line-height: 1.25; }
@@ -443,11 +527,11 @@
     .confetti { display: none; }
     .cover-inner, .record, .field .v, .disc-label { transition: none; }
     button:active { transform: none; }
-    #shell, #radar, #radar.show { transition: opacity 200ms var(--ease), visibility 0s linear 200ms; }
-    #radar, #radar.show { transform: none !important; }
-    #radar:not(.show) { opacity: 0; }
-    #radar.show { transition: opacity 200ms var(--ease), visibility 0s; }
-    .rel.in { animation: none; }
+    #shell, .bubble, .bubble.show { transition: opacity 200ms var(--ease), visibility 0s linear 200ms; }
+    .bubble, .bubble.show { transform: none !important; }
+    .bubble:not(.show), #radar:not(.show), #modes:not(.show) { opacity: 0; }
+    .bubble.show { transition: opacity 200ms var(--ease), visibility 0s; }
+    .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad { animation: none; }
   }
 </style>
 </head>
@@ -463,10 +547,9 @@
       <button id="pipBtn" title="Pop out as always-on-top widget" aria-label="Pop out as always-on-top widget">⧉</button>
     </div>
   </header>
-  <div class="seg" role="group" aria-label="Guess style">
-    <button data-imode="type" aria-pressed="true">Type</button>
-    <button data-imode="pick" aria-pressed="false">Pick 5</button>
-  </div>
+  <button id="modeBtn" type="button" aria-pressed="false" aria-haspopup="dialog" title="Game mode — Quiz, Pick 5, Heardle or Hitster">
+    <span id="modeIcon" aria-hidden="true">✍️</span><span><b id="modeName">Quiz</b><small id="modeDesc">type artist · song · year</small></span><i>◂ mode</i>
+  </button>
   <div id="conn"><span id="led" class="led"></span><span id="connText">not connected</span><button id="reconnect" title="Log in to Spotify again">reconnect</button><button id="radarBtn" aria-pressed="false" title="Release radar — new music from your artists">📡 radar</button></div>
   <div id="net"><span id="netLed" class="led"></span><span id="netText"></span><button id="netInvite" hidden>Invite</button><button id="roomsBtn" aria-pressed="false" title="Public rooms — find a game to join">🌍 Find</button><button id="netBtn">Host</button></div>
   <div id="jam">
@@ -505,6 +588,14 @@
   <label class="field" id="fArtist"><input id="gArtist" placeholder="Artist" aria-label="Artist" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
   <label class="field" id="fSong"><input id="gSong" placeholder="Song" aria-label="Song" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
   <label class="field" id="fYear"><input id="gYear" placeholder="Year" aria-label="Year" inputmode="numeric" maxlength="4" autocomplete="off" /><span class="v" aria-hidden="true"></span></label>
+  <div id="heardle">
+    <div id="hdBar" aria-hidden="true"><i id="hdOpen"></i><i id="hdFill"></i></div>
+    <div class="hd-row"><span id="hdInfo"></span><button id="hdMore" type="button">+ more</button><button id="hdPlay" type="button">▶ replay</button></div>
+  </div>
+  <div id="timeline">
+    <div id="tlHead"><span id="tlInfo"></span><button id="tlNew" type="button">Restart</button></div>
+    <div id="tlCards" role="group" aria-label="Your timeline"></div>
+  </div>
   <div id="choices" role="group" aria-label="Choices">
     <div id="choiceLabel"></div>
     <div id="choiceList"></div>
@@ -521,7 +612,15 @@
   <footer><span class="solo-only"><kbd>⏎</kbd> next field · <kbd>Ctrl ⏎</kbd> check · no peeking at Spotify</span><span class="vs-only">one shot each · <kbd>Ctrl ⏎</kbd> lock in · song ends = time's up</span></footer>
 </div>
 <div id="radarScrim" aria-hidden="true"></div>
-  <div id="radar" role="dialog" aria-label="Release radar" aria-live="polite">
+  <div id="modes" class="bubble" role="dialog" aria-label="Game mode">
+    <div class="lobby-head"><span>Game mode</span><button id="modesClose" type="button" aria-label="Close game mode">✕</button></div>
+    <div id="modesBody">
+      <div id="modeList" role="radiogroup" aria-label="Game mode"></div>
+      <div id="modeConf"></div>
+      <div id="modesNote"></div>
+    </div>
+  </div>
+  <div id="radar" class="bubble" role="dialog" aria-label="Release radar" aria-live="polite">
     <div class="lobby-head"><span>Release radar</span><button id="radarRefresh" type="button">Refresh</button><button id="radarClose" type="button" aria-label="Close release radar">✕</button></div>
     <div class="seg" id="radarSeg" role="group" aria-label="How far back">
       <button data-range="7" aria-pressed="false">Week</button>
@@ -620,7 +719,10 @@ const els = {
   check: $("check"), reveal: $("reveal"), skip: $("skip"),
   pipBtn: $("pipBtn"), vsBtn: $("vsBtn"), vsResult: $("vsResult"), lyrBtn: $("lyrBtn"), lyrics: $("lyrics"),
   vsScore: $("vsScore"), songsRow: $("stSongs"), sWins: $("sWins"), rows: [], // rows: { stat, name, pts } by seat
-  imodes: document.querySelectorAll("[data-imode]"),
+  modeBtn: $("modeBtn"), modeIcon: $("modeIcon"), modeName: $("modeName"), modeDesc: $("modeDesc"),
+  modes: $("modes"), modesClose: $("modesClose"), modeList: $("modeList"), modeConf: $("modeConf"), modesNote: $("modesNote"),
+  hdOpen: $("hdOpen"), hdFill: $("hdFill"), hdBar: $("hdBar"), hdInfo: $("hdInfo"), hdMore: $("hdMore"), hdPlay: $("hdPlay"),
+  tlInfo: $("tlInfo"), tlNew: $("tlNew"), tlCards: $("tlCards"),
   choiceLabel: $("choiceLabel"), choiceList: $("choiceList"),
   led: $("led"), connText: $("connText"), reconnect: $("reconnect"),
   jam: $("jam"), jamLink: $("jamLink"), jamJoin: $("jamJoin"), jamHint: $("jamHint"), pubBtn: $("pubBtn"), pubHint: $("pubHint"),
@@ -877,6 +979,7 @@ function newRound(track, key, carry = "") {
   setupChoices(track);
   if (lyricsOn && track.song) loadLyrics(track, key); // early, for the hint
   renderLyrics();
+  gameRoundStart();
 }
 
 // answer key: the last 5 songs, newest first, kept across reloads for practice
@@ -923,6 +1026,8 @@ function check() {
   if (!state.track || state.revealed) return;
   if (usingPick()) return;
   if (vs.on) { vsLockTyped(); return; }
+  if (activeGame() === "heardle") { heardleCheck(); return; }
+  if (activeGame() === "hitster") return;
   const t = state.track;
   const aOk = fuzzyMatch(els.artist.value, t.artists);
   const sOk = fuzzyMatch(els.song.value, [t.song]);
@@ -980,6 +1085,7 @@ function finish(msg, win, note) {
     els.coverBack.textContent = (state.track.song.match(/\b\p{L}/gu) || ["♪"]).slice(0, 2).join("").toUpperCase();
   }
   els.cover.classList.add("flipped");
+  gameRoundEnd();
 }
 
 function reveal() {
@@ -1004,6 +1110,10 @@ function usingPick() {
 
 function applyInputUI() {
   els.app.classList.toggle("pick", usingPick());
+  const g = activeGame();
+  els.app.classList.toggle("heardle", g === "heardle");
+  els.app.classList.toggle("hd-both", g === "heardle" && game.heardle.guess === "both");
+  els.app.classList.toggle("hitster", g === "hitster");
 }
 
 function setImode(imode) {
@@ -1011,7 +1121,8 @@ function setImode(imode) {
   state.imode = imode;
   state.choicesFailed = false;
   choiceSeq++;
-  els.imodes.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.imode === imode)));
+  renderModeBtn();
+  renderModes();
   els.artist.value = ""; els.song.value = ""; els.year.value = "";
   fields.forEach((f) => setVerdict(f, null));
   state.choice = { stage: 0, opts: null, accepted: null, results: [], picks: [] };
@@ -1256,6 +1367,7 @@ function replayRound() {
 
 function setVersus(on) {
   if (!on && net.role === "host") stopHosting(true);
+  if (on && SOLO_GAMES.includes(game.id)) setGame("quiz");
   vs.on = on;
   vs.players = localPlayers();
   vs.guesses = [];
@@ -1264,6 +1376,8 @@ function setVersus(on) {
   els.vsBtn.setAttribute("aria-pressed", String(on));
   updateScore();
   renderNet();
+  applyInputUI();
+  renderModes();
   if (replayRound()) return;
   setTurnHighlight(-1);
   setStatus(on ? "versus on — first song up next" : "solo mode");
@@ -1460,6 +1574,18 @@ async function api(url, opts = {}) {
   return res;
 }
 
+function trackFromItem(item) {
+  return {
+    artists: item.artists.map((a) => a.name),
+    song: item.name,
+    third: { label: "year", answer: parseInt(((item.album && item.album.release_date) || "0").slice(0, 4), 10) },
+    artUrl: (item.album && item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
+    albumId: item.album ? item.album.id : null,
+    album: item.album ? item.album.name : "",
+    duration: item.duration_ms || 0,
+  };
+}
+
 async function pollSpotify() {
   try {
     const res = await api("https://api.spotify.com/v1/me/player/currently-playing");
@@ -1474,17 +1600,14 @@ async function pollSpotify() {
     if (!data || !data.item) { console.log("[gtt] poll ok, no item"); return; }
     console.log("[gtt] poll ok, item:", data.item.id, "playing:", !!data.is_playing);
     const item = data.item;
-    const track = {
-      artists: item.artists.map((a) => a.name),
-      song: item.name,
-      third: { label: "year", answer: parseInt((item.album.release_date || "0").slice(0, 4), 10) },
-      artUrl: (item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
-      albumId: item.album ? item.album.id : null,
-      album: item.album ? item.album.name : "",
-      duration: item.duration_ms || 0,
-    };
     const key = item.id;
-    if (key !== state.trackKey) newRound(track, key);
+    state.context = data.context ? data.context.uri : null;
+    // Heardle just asked Spotify for a new song; until it's actually on, the old one is stale news
+    if (state.expect) {
+      if (key === state.expect.key || Date.now() > state.expect.until) state.expect = null;
+      else return;
+    }
+    if (key !== state.trackKey) newRound(trackFromItem(item), key);
     setPlaying(!!data.is_playing);
     state.trackDuration = item.duration_ms || 0;
     state.pos = { position_ms: data.progress_ms || 0, timestamp_ms: Date.now(), speed: data.is_playing ? 1 : 0 };
@@ -1528,6 +1651,7 @@ async function startSpotify() {
   setStatus("listening…");
   pollSpotify();
   state.pollTimer = setInterval(pollSpotify, CONFIG.pollMs);
+  setPollRate();
 }
 
 function loadToken() {
@@ -1611,14 +1735,12 @@ async function refreshAccessToken() {
   } catch { return false; }
 }
 
-els.imodes.forEach((b) => {
-  b.onclick = () => setImode(b.dataset.imode);
-});
 els.check.onclick = check;
 els.reveal.onclick = reveal;
 // skip = give up on this song (if it's still open) and jump to the next one in Spotify
 els.skip.onclick = () => {
   if (net.role === "guest" || state.mode !== "spotify") return;
+  if (activeGame() === "heardle") { heardleNext(); return; }
   if (state.track && !state.revealed) {
     if (vs.on) {
       setTurnHighlight(-1);
@@ -1657,7 +1779,7 @@ async function skipTrack() {
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || e.ctrlKey || e.metaKey) return;
     e.preventDefault();
-    const next = all.slice(i + 1).find((n) => !n.readOnly);
+    const next = all.slice(i + 1).find((n) => !n.readOnly && n.offsetParent !== null); // Heardle hides the year
     if (next) next.focus(); else check();
   });
 });
@@ -1688,10 +1810,10 @@ async function togglePip() {
       pipWindow.document.head.appendChild(link);
     }
   }
-  pipWindow.document.body.append(els.app, els.radarScrim, els.radar);
+  pipWindow.document.body.append(els.app, els.radarScrim, els.modes, els.radar);
   pipWindow.document.addEventListener("keydown", radarEscape);
   pipWindow.addEventListener("pagehide", () => {
-    els.shell.append(els.app, els.radarScrim, els.radar);
+    els.shell.append(els.app, els.radarScrim, els.modes, els.radar);
   });
 }
 els.pipBtn.onclick = togglePip;
@@ -2202,7 +2324,7 @@ async function startGuest(code, jam) {
   vs.on = true;
   vs.players = [{ name: "", points: 0, wins: 0 }]; // the host's seat, until they say hello
   els.app.classList.add("vs", "guest");
-  els.imodes.forEach((b) => { b.disabled = true; });
+  renderModeBtn();
   setConn("wait", "no Spotify needed — the host is playing");
   setStatus("joining room " + code + "…");
   renderNet();
@@ -2438,6 +2560,477 @@ els.lobbyRefresh.onclick = scanRooms;
 els.lobbyClose.onclick = () => setLobbyOpen(false);
 els.lobbyLogin.onclick = () => { location.href = location.pathname; };
 
+// ---------- game modes: Quiz and Pick 5 (versus too), Heardle and Hitster (solo) ----------
+const GAMES = {
+  quiz: { icon: "✍️", name: "Quiz", short: "type artist · song · year", desc: "Type the artist, song and year" },
+  pick: { icon: "🖐", name: "Pick 5", short: "multiple choice, 3 steps", desc: "Pick from 5 — artist, song, then year" },
+  heardle: { icon: "⏱", name: "Heardle", short: "name it from the first seconds", desc: "1 second of intro, then a bit more. Needs Premium" },
+  hitster: { icon: "🃏", name: "Hitster", short: "place songs on your timeline", desc: "Before or after? Build a timeline of years" },
+};
+const SOLO_GAMES = ["heardle", "hitster"];
+const HEARDLE_LADDERS = { classic: [1, 2, 4, 7, 11, 16], hard: [0.5, 1, 2, 4, 8], chill: [2, 4, 8, 16, 30] };
+// mode + settings live in this browser's localStorage, like the scores and the answer key
+const game = { id: "quiz", heardle: { ladder: "classic", guess: "song" }, hitster: { target: 10, lives: 3 } };
+try {
+  const g = JSON.parse(localStorage.getItem("gtt_game")) || {};
+  if (GAMES[g.id]) game.id = g.id;
+  if (g.heardle && HEARDLE_LADDERS[g.heardle.ladder]) game.heardle.ladder = g.heardle.ladder;
+  if (g.heardle && ["song", "both"].includes(g.heardle.guess)) game.heardle.guess = g.heardle.guess;
+  if (g.hitster && [5, 10, 15].includes(g.hitster.target)) game.hitster.target = g.hitster.target;
+  if (g.hitster && [1, 3, 5].includes(g.hitster.lives)) game.hitster.lives = g.hitster.lives;
+} catch {}
+state.imode = game.id === "pick" ? "pick" : "type";
+const modes = { open: false, armed: 0 };
+
+function saveGame() {
+  try { localStorage.setItem("gtt_game", JSON.stringify(game)); } catch {}
+}
+
+// versus (and every guest) only plays Quiz or Pick 5
+function activeGame() {
+  if (vs.on || net.role) return state.imode === "pick" ? "pick" : "quiz";
+  return game.id;
+}
+
+function narrowScreen() {
+  return els.app.ownerDocument.defaultView.matchMedia("(max-width: 47.99rem)").matches;
+}
+
+function syncBubbles() {
+  els.shell.classList.toggle("radar-open", radar.open);
+  els.shell.classList.toggle("modes-open", modes.open);
+  els.radarScrim.classList.toggle("show", radar.open || modes.open);
+}
+
+function setPollRate() {
+  if (state.mode !== "spotify" || !state.pollTimer) return;
+  clearInterval(state.pollTimer);
+  // Heardle polls faster: a song Spotify starts on its own should be caught before it gives itself away
+  state.pollTimer = setInterval(pollSpotify, activeGame() === "heardle" ? 1500 : CONFIG.pollMs);
+}
+
+function setGame(id) {
+  if (!GAMES[id] || net.role === "guest") return;
+  if (vs.on && SOLO_GAMES.includes(id)) return;
+  const prev = game.id;
+  game.id = id;
+  saveGame();
+  state.choicesFailed = false;
+  setImode(id === "pick" ? "pick" : "type");
+  applyInputUI();
+  renderModeBtn();
+  renderModes();
+  setPollRate();
+  if (prev === id) return;
+  if (prev === "heardle") { heardleStop(); playerCall("play"); } // let the music run again
+  if (id === "heardle") { heardleNext(true); return; } // a fresh song, from second zero
+  if (!replayRound()) {
+    if (id === "hitster") renderTimeline();
+    setStatus(GAMES[id].name + " — next song's up");
+  }
+}
+
+function gameRoundStart() {
+  const g = activeGame();
+  if (g === "heardle") heardleStart();
+  else if (g === "hitster") hitsterStart();
+}
+
+function gameRoundEnd() {
+  const g = activeGame();
+  if (g === "heardle" && hd.key === state.trackKey) {
+    // the reward: hear it properly, from the top
+    heardleStop();
+    api("https://api.spotify.com/v1/me/player/seek?position_ms=0", { method: "PUT" }).then(() => playerCall("play")).catch(() => {});
+  }
+  if (g === "hitster") renderTimeline();
+}
+
+function playerCall(path, body) {
+  return api("https://api.spotify.com/v1/me/player/" + path, {
+    method: "PUT",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+// ----- Heardle: 1 second, then 2, 4, 7… every wrong guess (or "+ more") unlocks a longer snippet
+const hd = { key: null, stage: 0, timer: 0, pending: null, busy: false, playingSecs: 0 };
+
+function hdLadder() {
+  return HEARDLE_LADDERS[game.heardle.ladder];
+}
+
+function fmtSecs(n) {
+  return (n < 1 ? "½" : n) + "s";
+}
+
+function heardleStop() {
+  clearTimeout(hd.timer);
+  hd.playingSecs = 0;
+  renderHeardle();
+}
+
+// switching = just changed modes, so the song that was on doesn't count as skipped
+async function heardleNext(switching) {
+  if (hd.busy || state.mode !== "spotify") return;
+  hd.busy = true;
+  els.skip.disabled = true;
+  try {
+    hd.key = null; // no victory lap for a skipped song
+    if (state.track && !state.revealed && !switching) {
+      state.rounds += 1; state.streak = 0;
+      finish("skipped", false, "skipped");
+    }
+    heardleStop();
+    const q = await spotifyJson("https://api.spotify.com/v1/me/player/queue");
+    const item = (q.queue || []).find((t) => t && t.type === "track" && t.id && t.id !== state.trackKey);
+    if (!item) { setStatus("nothing up next in Spotify — start a playlist, then hit Skip"); return; }
+    hd.pending = { uri: item.uri, ctx: state.context };
+    state.expect = { key: item.id, until: Date.now() + 8000 };
+    newRound(trackFromItem(item), item.id);
+  } catch (e) {
+    setStatus(e.status === 404 ? "no active Spotify player — press play in Spotify first" : "couldn't get the next song (" + (e.status || e.message) + ")");
+  } finally {
+    hd.busy = false;
+    setTimeout(() => { els.skip.disabled = false; }, 800);
+  }
+}
+
+function heardleStart() {
+  hd.key = state.trackKey;
+  hd.stage = 0;
+  setStatus("Heardle — " + fmtSecs(hdLadder()[0]) + " of intro, name it!");
+  if (els.app.ownerDocument.hasFocus()) (game.heardle.guess === "both" ? els.artist : els.song).focus();
+  heardleSnippet();
+}
+
+async function heardleSnippet() {
+  const ladder = hdLadder();
+  const secs = ladder[Math.min(hd.stage, ladder.length - 1)];
+  const key = hd.key;
+  clearTimeout(hd.timer);
+  let res;
+  try {
+    if (hd.pending) {
+      // switch songs ourselves so the first thing you hear is second zero
+      const p = hd.pending;
+      hd.pending = null;
+      const inContext = p.ctx && !/:artist:/.test(p.ctx);
+      res = await playerCall("play", inContext ? { context_uri: p.ctx, offset: { uri: p.uri }, position_ms: 0 } : { uris: [p.uri], position_ms: 0 });
+      if (!res.ok && inContext) res = await playerCall("play", { uris: [p.uri], position_ms: 0 });
+    } else {
+      await api("https://api.spotify.com/v1/me/player/seek?position_ms=0", { method: "PUT" });
+      res = await playerCall("play");
+    }
+  } catch { setStatus("couldn't reach Spotify"); return; }
+  if (!res.ok) {
+    setStatus(res.status === 403 ? "Heardle needs Spotify Premium to start and stop songs"
+      : res.status === 404 ? "no active Spotify player — press play in Spotify first"
+      : "couldn't play the snippet (" + res.status + ")");
+    return;
+  }
+  if (hd.key !== key || state.revealed) return;
+  hd.playingSecs = secs;
+  renderHeardle();
+  hd.timer = setTimeout(() => {
+    hd.playingSecs = 0;
+    renderHeardle();
+    if (hd.key === key && !state.revealed) playerCall("pause").catch(() => {});
+  }, secs * 1000);
+}
+
+function heardleCheck() {
+  const t = state.track;
+  const both = game.heardle.guess === "both";
+  if (!els.song.value.trim() && !(both && els.artist.value.trim())) { heardleMore(); return; } // empty guess = "+ more"
+  const sOk = fuzzyMatch(els.song.value, [t.song]);
+  const aOk = !both || fuzzyMatch(els.artist.value, t.artists);
+  setVerdict(els.fSong, sOk ? "ok" : "bad");
+  if (both) setVerdict(els.fArtist, aOk ? "ok" : "bad");
+  if (sOk && aOk) {
+    const ladder = hdLadder();
+    const earned = ladder.length - hd.stage;
+    state.rounds += 1; state.points += earned; state.streak += 1;
+    finish(hd.stage === 0 ? "first try! unreal ears" : "got it in " + fmtSecs(ladder[hd.stage]) + " — +" + earned, true, "+" + earned);
+    popPoints(earned);
+    burst();
+    return;
+  }
+  fields.filter((f) => f.classList.contains("bad")).forEach(shake);
+  heardleMore(true);
+}
+
+function heardleMore(wrong) {
+  if (!state.track || state.revealed || activeGame() !== "heardle") return;
+  const ladder = hdLadder();
+  if (hd.stage >= ladder.length - 1) {
+    state.rounds += 1; state.streak = 0;
+    finish("out of snippets — 0 points", false, "0");
+    return;
+  }
+  hd.stage += 1;
+  setStatus((wrong ? "nope — " : "") + "here's " + fmtSecs(ladder[hd.stage]));
+  heardleSnippet();
+}
+
+function renderHeardle() {
+  if (activeGame() !== "heardle") return;
+  const ladder = hdLadder();
+  const max = ladder[ladder.length - 1];
+  const stage = Math.min(hd.stage, ladder.length - 1);
+  const open = state.revealed ? 1 : ladder[stage] / max;
+  els.hdOpen.style.width = (open * 100).toFixed(2) + "%";
+  els.hdBar.querySelectorAll("s").forEach((t) => t.remove());
+  ladder.slice(0, -1).forEach((n) => {
+    const tick = document.createElement("s");
+    tick.style.left = (n / max * 100).toFixed(2) + "%";
+    els.hdBar.append(tick);
+  });
+  // the fill runs across the snippet while it plays
+  const fill = els.hdFill;
+  fill.style.transition = "none";
+  fill.style.width = "0";
+  if (hd.playingSecs && !reduceMotion.matches) {
+    void fill.offsetWidth;
+    fill.style.transition = "width " + hd.playingSecs + "s linear";
+    fill.style.width = (hd.playingSecs / max * 100).toFixed(2) + "%";
+  }
+  const left = ladder.length - stage;
+  els.hdInfo.textContent = state.revealed ? "" : fmtSecs(ladder[stage]) + " · worth " + left + (left === 1 ? " point" : " points");
+  els.hdMore.disabled = els.hdPlay.disabled = !state.track || state.revealed;
+  els.hdMore.textContent = stage >= ladder.length - 1 ? "give up" : "+ more";
+}
+
+els.hdPlay.onclick = () => { if (state.track && !state.revealed) heardleSnippet(); };
+els.hdMore.onclick = () => heardleMore(false);
+
+// ----- Hitster: one free starter card, then place every song before, between or after the ones you have
+let hs = { cards: [], lives: game.hitster.lives, maxLives: game.hitster.lives, target: game.hitster.target, over: false, last: null };
+try {
+  const saved = JSON.parse(localStorage.getItem("gtt_hitster"));
+  if (saved && Array.isArray(saved.cards)) hs = { ...hs, ...saved, last: null };
+} catch {}
+let restartArmedAt = 0;
+
+function hsSave() {
+  try { localStorage.setItem("gtt_hitster", JSON.stringify({ cards: hs.cards, lives: hs.lives, maxLives: hs.maxLives, target: hs.target, over: hs.over })); } catch {}
+}
+
+function hsWon() {
+  return hs.cards.length >= hs.target;
+}
+
+function hsCard() {
+  const t = state.track;
+  return { key: state.trackKey, year: t.third.answer, song: t.song, artist: t.artists[0] || "" };
+}
+
+function hitsterNewGame() {
+  hs = { cards: [], lives: game.hitster.lives, maxLives: game.hitster.lives, target: game.hitster.target, over: false, last: null };
+  hsSave();
+  if (!replayRound()) { renderTimeline(); setStatus("new timeline — the next song is your free starter card"); }
+  renderModes();
+}
+
+function hitsterStart() {
+  hs.last = null;
+  if (hs.over || hsWon()) {
+    renderTimeline();
+    setStatus(hsWon() ? "you won this timeline — hit New game for another" : "game over — hit New game to go again");
+    return;
+  }
+  if (!hs.cards.length) {
+    hs.cards.push(hsCard());
+    hs.last = { key: state.trackKey, ok: true };
+    hsSave();
+    state.rounds += 1;
+    finish("your starter card: " + state.track.third.answer + " — now place the next one", true, "starter");
+    return;
+  }
+  renderTimeline();
+  setStatus("where does this one go? tap a ＋");
+}
+
+function hitsterPlace(i) {
+  if (!state.track || state.revealed || hs.over || hsWon()) return;
+  const card = hsCard();
+  const before = hs.cards[i - 1], after = hs.cards[i];
+  const ok = (!before || before.year <= card.year) && (!after || card.year <= after.year);
+  state.rounds += 1;
+  if (ok) {
+    hs.cards.splice(i, 0, card);
+    hs.last = { key: card.key, ok: true };
+    state.points += 1; state.streak += 1;
+    if (hsWon()) { finish("you won! " + hs.cards.length + " cards on the timeline", true, "+1"); burst(); }
+    else finish(card.year + " — spot on! " + hs.cards.length + "/" + hs.target, true, "+1");
+    popPoints(1);
+  } else {
+    hs.lives -= 1; state.streak = 0;
+    hs.last = { key: card.key, ok: false, card };
+    if (hs.lives <= 0) { hs.over = true; finish("it was " + card.year + " — game over at " + hs.cards.length + " cards", false, "✗"); }
+    else finish("nope, it was " + card.year + " — " + hs.lives + (hs.lives === 1 ? " life" : " lives") + " left", false, "✗");
+  }
+  hsSave();
+  renderTimeline();
+  renderModes();
+}
+
+function renderTimeline() {
+  if (activeGame() !== "hitster") return;
+  const open = !!state.track && !state.revealed && !hs.over && !hsWon() && hs.cards.length > 0;
+  const lost = Math.max(0, hs.maxLives - hs.lives);
+  els.tlInfo.textContent = hs.cards.length + "/" + hs.target + " cards · " + "❤️".repeat(Math.max(0, hs.lives)) + "🖤".repeat(Math.min(lost, 5));
+  els.tlNew.textContent = hs.over || hsWon() ? "New game" : "Restart";
+  const items = [];
+  const miss = hs.last && !hs.last.ok && hs.last.key === state.trackKey ? hs.last.card : null;
+  const missAt = miss ? hs.cards.filter((c) => c.year <= miss.year).length : -1;
+  hs.cards.forEach((c, i) => {
+    if (i === missAt) items.push(tlChip(miss, "bad"));
+    items.push(tlSlot(i, open));
+    items.push(tlChip(c, hs.last && hs.last.ok && hs.last.key === c.key && c.key === state.trackKey ? "fresh" : ""));
+  });
+  if (missAt === hs.cards.length) items.push(tlChip(miss, "bad"));
+  items.push(tlSlot(hs.cards.length, open));
+  els.tlCards.replaceChildren(...items);
+}
+
+function tlSlot(i, open) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "slot";
+  b.textContent = "＋";
+  b.disabled = !open;
+  b.setAttribute("aria-label", i === 0 ? "Place before everything" : i === hs.cards.length ? "Place after everything" : "Place between " + hs.cards[i - 1].year + " and " + hs.cards[i].year);
+  b.onclick = () => hitsterPlace(i);
+  return b;
+}
+
+function tlChip(c, cls) {
+  const d = document.createElement("div");
+  d.className = "tl-card" + (cls ? " " + cls : "");
+  d.title = c.song + " — " + c.artist;
+  const y = document.createElement("b");
+  y.textContent = c.year;
+  const t = document.createElement("span");
+  t.textContent = c.song;
+  d.append(y, t);
+  return d;
+}
+
+els.tlNew.onclick = () => {
+  if (!hs.over && !hsWon() && hs.cards.length > 1 && Date.now() - restartArmedAt > 4000) {
+    restartArmedAt = Date.now();
+    setStatus("tap Restart again — this timeline will be gone");
+    return;
+  }
+  hitsterNewGame();
+};
+
+// ----- the mode button on the card and the bubble on its left
+function renderModeBtn() {
+  const g = GAMES[activeGame()];
+  els.modeIcon.textContent = g.icon;
+  els.modeName.textContent = g.name;
+  els.modeDesc.textContent = net.role === "guest" ? "the host picks the mode" : g.short;
+  els.modeBtn.disabled = net.role === "guest";
+  els.modeBtn.setAttribute("aria-pressed", String(modes.open));
+}
+
+function confRow(label, options, current, pick) {
+  const row = document.createElement("div");
+  row.className = "conf";
+  const name = document.createElement("span");
+  name.textContent = label;
+  const seg = document.createElement("div");
+  seg.className = "seg";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", label);
+  for (const [value, text] of options) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    b.setAttribute("aria-pressed", String(value === current));
+    b.onclick = () => { pick(value); saveGame(); renderModes(); };
+    seg.append(b);
+  }
+  row.append(name, seg);
+  return row;
+}
+
+function renderModes() {
+  els.modes.classList.toggle("show", modes.open);
+  renderModeBtn();
+  if (!modes.open) return;
+  const cur = activeGame();
+  let fresh = 0;
+  els.modeList.replaceChildren(...Object.entries(GAMES).map(([id, g]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mode-card";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(id === cur));
+    const locked = (vs.on || !!net.role) && SOLO_GAMES.includes(id);
+    b.disabled = locked || net.role === "guest";
+    const icon = document.createElement("i");
+    icon.textContent = g.icon;
+    const name = document.createElement("b");
+    name.textContent = g.name;
+    const desc = document.createElement("span");
+    desc.textContent = locked ? "solo only — turn off VS to play" : g.desc;
+    b.append(icon, name, desc);
+    b.onclick = () => setGame(id);
+    if (modes.animate) { b.classList.add("in"); b.style.setProperty("--i", fresh++); }
+    return b;
+  }));
+  modes.animate = false;
+  const conf = [];
+  if (cur === "heardle") {
+    conf.push(confRow("Snippets", [["classic", "1 → 16s"], ["hard", "½ → 8s"], ["chill", "2 → 30s"]], game.heardle.ladder, (v) => {
+      game.heardle.ladder = v;
+      hd.stage = Math.min(hd.stage, hdLadder().length - 1);
+      renderHeardle();
+    }));
+    conf.push(confRow("Guess", [["song", "Song"], ["both", "Artist + song"]], game.heardle.guess, (v) => { game.heardle.guess = v; applyInputUI(); }));
+  } else if (cur === "hitster") {
+    conf.push(confRow("Cards to win", [[5, "5"], [10, "10"], [15, "15"]], game.hitster.target, (v) => {
+      game.hitster.target = v;
+      if (!hs.over && hs.cards.length < v) { hs.target = v; hsSave(); renderTimeline(); }
+    }));
+    conf.push(confRow("Lives (from the next game)", [[1, "1"], [3, "3"], [5, "5"]], game.hitster.lives, (v) => { game.hitster.lives = v; }));
+    const again = document.createElement("button");
+    again.type = "button";
+    again.id = "modesNew";
+    again.textContent = "New game";
+    again.onclick = hitsterNewGame;
+    conf.push(again);
+  } else {
+    conf.push(confRow("Lyric hint 🎤", [[false, "Off"], [true, "On"]], lyricsOn, (v) => setLyricsOn(v)));
+  }
+  els.modeConf.replaceChildren(...conf);
+  els.modesNote.textContent = net.role === "guest" ? "the host picks the mode for the room"
+    : cur === "heardle" ? "Heardle starts and pauses Spotify for you, so it needs Premium. Skip = next song, from second zero."
+    : cur === "hitster" ? "Now: " + hs.cards.length + "/" + hs.target + " cards, " + hs.lives + (hs.lives === 1 ? " life" : " lives") + " left. Years come from Spotify's album dates, so remasters can fool you."
+    : vs.on ? "Heardle and Hitster are solo for now — versus plays Quiz or Pick 5."
+    : "";
+}
+
+function setModesOpen(open) {
+  if (open === modes.open) return;
+  modes.open = open;
+  modes.animate = open;
+  if (open && narrowScreen()) setRadarOpen(false);
+  renderModes();
+  syncBubbles();
+}
+
+els.modeBtn.onclick = () => setModesOpen(!modes.open);
+els.modesClose.onclick = () => setModesOpen(false);
+applyInputUI();
+renderModeBtn();
+renderHeardle();
+renderTimeline();
+
 // ---------- release radar: the newest albums and singles from the artists you play most ----------
 const RADAR_SCOPES = ["user-top-read"];
 const RADAR_MAX_DAYS = 90;      // fetched once, the Week/Month/3 months tabs just filter
@@ -2579,8 +3172,7 @@ async function playRelease(r, btn) {
 
 function renderRadar() {
   els.radar.classList.toggle("show", radar.open);
-  els.radarScrim.classList.toggle("show", radar.open);
-  els.shell.classList.toggle("radar-open", radar.open);
+  syncBubbles();
   els.radarBtn.setAttribute("aria-pressed", String(radar.open));
   if (!radar.open) return;
   const allowed = radarScopeOk();
@@ -2640,6 +3232,7 @@ function renderRadar() {
 
 function setRadarOpen(open) {
   radar.open = open;
+  if (open && narrowScreen()) setModesOpen(false); // one sheet at a time on a phone
   radar.shown.clear();
   if (open) {
     // NEW = released since the last day you looked, kept for the rest of today
@@ -2657,9 +3250,11 @@ els.radarBtn.onclick = () => setRadarOpen(!radar.open);
 els.radarClose.onclick = () => setRadarOpen(false);
 els.radarRefresh.onclick = () => loadRadar(true);
 els.radarRanges.forEach((b) => { b.onclick = () => { radar.days = Number(b.dataset.range); radar.shown.clear(); renderRadar(); }; });
-els.radarScrim.onclick = () => setRadarOpen(false);
+els.radarScrim.onclick = () => { setRadarOpen(false); setModesOpen(false); };
 function radarEscape(e) {
-  if (e.key === "Escape" && radar.open) setRadarOpen(false);
+  if (e.key !== "Escape") return;
+  if (radar.open) setRadarOpen(false);
+  if (modes.open) setModesOpen(false);
 }
 document.addEventListener("keydown", radarEscape);
 // the new permissions need a fresh login, which goes through reconnect's "scores will reset" guard
