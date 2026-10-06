@@ -724,7 +724,8 @@
   .tv-body::before { left: 12cqw; }
   .tv-body::after { right: 12cqw; }
   .tv-bezel {
-    padding: 3cqw; border-radius: 4cqw; background: #121114;
+    display: grid; justify-items: center; gap: 1.4cqw;
+    padding: 3cqw 3cqw 1.6cqw; border-radius: 4cqw; background: #121114;
     box-shadow: inset 0 0 0 0.4cqw #0a090b, inset 0 1cqw 2cqw rgba(0, 0, 0, 0.85), 0 0.3cqw 0 rgba(255, 255, 255, 0.07);
   }
   .tv-screen {
@@ -766,13 +767,13 @@
   .tv-static { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; opacity: 0; pointer-events: none; image-rendering: pixelated; transition: opacity 260ms var(--ease); }
   .tv-static.burst { opacity: 0.9; transition: none; }
   .tv-osd {
-    position: absolute; z-index: 8; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
+    position: absolute; z-index: 6; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
     color: #4dff86; font-size: 6.5cqw; letter-spacing: 0.06em;
     opacity: 0; transition: opacity 500ms var(--ease);
   }
   .tv-osd.show { opacity: 1; transition: none; }
   .tv-ch { position: absolute; inset: 0; display: none; padding: 7cqw 9cqw; }
-  .tv[data-ch="1"] #tvNow, .tv[data-ch="2"] #tvNew, .tv[data-ch="3"] #tvQueue { display: flex; }
+  .tv[data-ch="1"] #tvNow, .tv[data-ch="2"] #tvNew, .tv[data-ch="3"] #tvQueue, .tv[data-ch="4"] #tvCover { display: flex; }
   /* CH1: now playing, VHS style */
   #tvNow { flex-direction: column; justify-content: space-between; }
   .vhs-top { display: flex; justify-content: space-between; font-size: 5.5cqw; color: #fff; }
@@ -785,7 +786,20 @@
     position: absolute; z-index: 7; width: 30cqw; aspect-ratio: 1; border-radius: 1.2cqw; object-fit: cover;
     display: none; opacity: 1; transition: opacity 400ms var(--ease);
   }
-  .tv[data-ch="1"] #tvArt.has { display: block; }
+  .tv[data-ch="1"] #tvArt.has, .tv[data-ch="4"] #tvArt.has { display: block; }
+  /* CH4: the cover, big, on its own colours (Spotify allows backgrounds taken from the artwork's colours) */
+  #tvCover {
+    flex-direction: column; align-items: center; justify-content: center; gap: 2.5cqw; padding: 4cqw 6cqw;
+    background: radial-gradient(ellipse at 50% 42%, var(--c1, #1a2a22) 0%, var(--c2, #0b1410) 62%, #030605 100%);
+    transition: background 600ms var(--ease);
+  }
+  .cover-slot { width: 44cqw; aspect-ratio: 1; flex: none; }
+  .cover-cap {
+    max-width: 100%; padding: 0.3cqw 1.8cqw; border-radius: 0.6cqw; background: rgba(0, 0, 0, 0.6);
+    font-size: 5cqw; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tv[data-ch="4"] .tv-osd { top: auto; bottom: 3.5cqw; }
+  .cover-cap em { font-style: normal; color: #7ff6ff; }
   .tv-screen.power-on #tvArt, .tv-screen.power-off #tvArt, .tv-screen.snowing #tvArt { opacity: 0; transition: none; }
   .vhs-bottom a { color: #1ed760; text-decoration: none; font-size: 4.6cqw; }
   .now-text { display: grid; gap: 1.2cqw; min-width: 0; }
@@ -837,8 +851,9 @@
   .fastext button:nth-child(3) { background: #ffff2a; } .fastext button:nth-child(4) { background: #2affff; }
   /* the control strip under the screen */
   .tv-panel { display: flex; align-items: center; gap: 2.2cqw; margin-top: 3cqw; padding: 0 1cqw; }
+  .tv-screen { width: 100%; }
   .tv-brand {
-    font: 800 3.2cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; letter-spacing: 0.32em;
+    font: 800 2.4cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; letter-spacing: 0.42em; padding-left: 0.42em;
     background: linear-gradient(180deg, #f2eff5, #8a8590); -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .tv-grille { flex: 1; height: 4.6cqw; border-radius: 1cqw; background: repeating-linear-gradient(90deg, #121114 0 0.7cqw, transparent 0.7cqw 1.6cqw); opacity: 0.85; }
@@ -1025,19 +1040,21 @@
             <div class="tv-ch" id="tvNow"></div>
             <div class="tv-ch" id="tvNew"></div>
             <div class="tv-ch" id="tvQueue"></div>
+            <div class="tv-ch" id="tvCover"></div>
           </div>
           <img id="tvArt" alt="" />
           <canvas class="tv-static" id="tvStatic" width="120" height="90"></canvas>
           <div class="tv-osd" id="tvOsd"></div>
         </div>
+        <span class="tv-brand">GROOVTRON</span>
       </div>
       <div class="tv-panel">
-        <span class="tv-brand">GROOVTRON</span>
         <span class="tv-grille" aria-hidden="true"></span>
         <div class="tv-btns">
           <button class="tv-btn" type="button" data-ch="1" aria-pressed="true" title="Channel 1 — now playing">1</button>
           <button class="tv-btn" type="button" data-ch="2" aria-pressed="false" title="Channel 2 — new releases from your radar">2</button>
           <button class="tv-btn" type="button" data-ch="3" aria-pressed="false" title="Channel 3 — queue">3</button>
+          <button class="tv-btn" type="button" data-ch="4" aria-pressed="false" title="Channel 4 — the cover, big">4</button>
           <button class="tv-btn" type="button" data-tv="prev" title="Previous song" aria-label="Previous song">⏮</button>
           <button class="tv-btn" type="button" data-tv="play" title="Play / pause" aria-label="Play or pause">⏯</button>
           <button class="tv-btn" type="button" data-tv="next" title="Next song" aria-label="Next song">⏭</button>
@@ -4080,10 +4097,11 @@ els.radarLogin.onclick = () => { sessionStorage.setItem("gtt_radar_login", "1");
 // ---------- Just listen: the retro TV (its own pop-out window, or a full-page overlay where there's no PiP) ----------
 const tv = { open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
 try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; } catch {}
-const TV_CHANNELS = { 1: "NOW", 2: "NEW", 3: "QUEUE" };
+const TV_CHANNELS = { 1: "NOW", 2: "NEW", 3: "QUEUE", 4: "COVER" };
+try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) tv.ch = c; } catch {} // the TV remembers its channel
 // grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
 const T = {
-  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), art: $("tvArt"),
+  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"),
   snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"),
 };
 
@@ -4108,6 +4126,7 @@ async function openTV() {
   if (activeGame() === "heardle") setGame("quiz"); // Heardle would keep pausing the music
   tv.open = true;
   const box = T.box;
+  tvShowChannel();
   box.classList.toggle("strong", tv.fx);
   box.querySelector('[data-tv="fx"]').setAttribute("aria-pressed", String(tv.fx));
   if ("documentPictureInPicture" in window) {
@@ -4196,13 +4215,18 @@ function tvStatic(ms = 320) {
 function tvSetChannel(ch) {
   if (tv.ch === ch) return;
   tv.ch = ch;
-  const box = T.box;
-  box.dataset.ch = String(ch);
-  box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.ch) === ch)));
+  try { localStorage.setItem("gtt_tv_ch", String(ch)); } catch {}
+  tvShowChannel();
   tvStatic(260);
   tvOsd("CH " + ch + " " + TV_CHANNELS[ch]);
   if (ch === 3 && Date.now() - tv.queueAt > 5000) tvLoadQueue();
   tvTick(true);
+  tvPlaceArt();
+}
+
+function tvShowChannel() {
+  T.box.dataset.ch = String(tv.ch);
+  T.box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.ch) === tv.ch)));
 }
 
 function tvTick(force) {
@@ -4214,11 +4238,13 @@ function tvTick(force) {
     if (!first) { tvStatic(); setTimeout(tvLoadQueue, 900); }
     tvRenderNow(true);
     if (tv.ch === 3) tvRenderQueue();
+    if (tv.ch === 4) tvRenderCover(true);
   }
   if (tv.ch === 1) tvRenderNow(force);
+  if (tv.ch === 4) tvRenderCover(force);
   if (tv.ch === 2) tvRenderNew(force);
   if (tv.ch === 3 && Date.now() - tv.queueAt > 20000) tvLoadQueue();
-  if (!t && tv.ch === 1) { T.art.classList.remove("has"); tvNoSignal(T.now, "NO SIGNAL"); }
+  if (!t && (tv.ch === 1 || tv.ch === 4)) { T.art.classList.remove("has"); tvNoSignal(tv.ch === 1 ? T.now : T.cover, "NO SIGNAL"); }
 }
 
 function el(tag, cls, text) {
@@ -4281,11 +4307,35 @@ function tvRenderNow(force) {
 
 // the cover lives outside the effects layer, over the empty slot CH1 leaves for it
 function tvPlaceArt() {
-  const slot = T.now.querySelector(".now-slot");
-  if (!slot) return;
+  const slot = tv.ch === 4 ? T.cover.querySelector(".cover-slot") : T.now.querySelector(".now-slot");
+  if (!slot || !T.screen.clientWidth) return;
   // in % of the screen, so it stays put when the pop-out window is resized
-  T.art.style.left = (slot.offsetLeft / T.screen.clientWidth * 100).toFixed(2) + "%";
-  T.art.style.top = (slot.offsetTop / T.screen.clientHeight * 100).toFixed(2) + "%";
+  const w = T.screen.clientWidth, h = T.screen.clientHeight;
+  T.art.style.left = (slot.offsetLeft / w * 100).toFixed(2) + "%";
+  T.art.style.top = (slot.offsetTop / h * 100).toFixed(2) + "%";
+  T.art.style.width = (slot.offsetWidth / w * 100).toFixed(2) + "%";
+}
+
+// CH4: the cover as big as the screen allows, untouched, on a glow of its own two main colours
+function tvRenderCover(force) {
+  const box = T.cover;
+  const t = state.track;
+  if (!t) return;
+  if (force || box.dataset.view !== "cover:" + tv.key) {
+    box.dataset.view = "cover:" + tv.key;
+    box.dataset.colors = "";
+    const cap = el("div", "cover-cap");
+    cap.append(t.song + "  ", el("em", "", t.artists.join(", ")));
+    box.replaceChildren(el("div", "cover-slot"), cap);
+    if (t.artUrl) { T.art.src = t.artUrl; T.art.classList.add("has"); } else T.art.classList.remove("has");
+    tvPlaceArt();
+  }
+  const cols = state.colors && state.colors.key === tv.key ? state.colors.colors : null;
+  if (box.dataset.colors !== String(cols)) {
+    box.dataset.colors = String(cols);
+    if (cols) { box.style.setProperty("--c1", cols[0]); box.style.setProperty("--c2", cols[1]); }
+    else { box.style.removeProperty("--c1"); box.style.removeProperty("--c2"); }
+  }
 }
 
 // CH2: the release radar as a teletext page — tap one to play it
@@ -4421,7 +4471,7 @@ async function tvAction(act) {
 
 function tvKeys(e) {
   if (!tv.open || e.target.closest && e.target.closest("input")) return;
-  if (e.key === "1" || e.key === "2" || e.key === "3") tvSetChannel(Number(e.key));
+  if (["1", "2", "3", "4"].includes(e.key)) tvSetChannel(Number(e.key));
   else if (e.key === " ") { e.preventDefault(); tvAction("play"); }
   else if (e.key === "ArrowRight") tvAction("next");
   else if (e.key === "ArrowLeft") tvAction("prev");
