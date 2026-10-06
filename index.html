@@ -730,38 +730,36 @@
   }
   .tv-screen {
     position: relative; aspect-ratio: 4 / 3; overflow: hidden; isolation: isolate; border-radius: 9% / 12%;
-    background: radial-gradient(ellipse at 50% 45%, #0f1d18, #050a08 75%); color: #d6ffe6; font-size: 5cqw; line-height: 1.05;
+    background: radial-gradient(ellipse at 50% 45%, #1a3027, #0d1a14 68%, #070e0b); color: #d6ffe6; font-size: 5cqw; line-height: 1.05;
     box-shadow: inset 0 0 6cqw rgba(0, 0, 0, 0.9);
     text-shadow: 0 0 0.7cqw currentColor, 0.22cqw 0 0 rgba(255, 30, 80, 0.35), -0.22cqw 0 0 rgba(0, 170, 255, 0.35);
   }
   /* the CRT, layer by layer: bloom lets bright parts bleed over the gaps, soft beam lines sized to the screen
      (~200 of them, never finer than 3px so they don't shimmer), an RGB aperture grille, and a slow rolling band */
-  .tv-screen { --line: max(3px, 0.32cqw); --grille: max(3px, 0.36cqw); }
+  .tv-screen { --line: 3px; --gap: 1px; --grille: max(3px, 0.36cqw); } /* --line/--gap are set in whole device pixels by tvScanlines() */
   .crt-bloom, .crt-lines, .crt-grille, .crt-roll { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
   .crt-bloom {
     z-index: 5; mix-blend-mode: screen; opacity: 0.4;
     -webkit-backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2); backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2);
   }
-  .crt-lines {
-    z-index: 6; mix-blend-mode: multiply;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(110, 110, 110, 1) 50%, rgba(255, 255, 255, 1) 100%) 0 0 / 100% var(--line) repeat;
-    opacity: 0.6;
-  }
+  /* the beam lines are drawn on a canvas, one row per physical pixel, lined up with the screen's pixel grid
+     (a CSS gradient pattern smears into grey at 125% display scaling) */
+  .crt-lines { z-index: 6; mix-blend-mode: multiply; width: 100%; opacity: 0.6; image-rendering: pixelated; }
   .crt-grille {
     z-index: 6; mix-blend-mode: multiply; opacity: 0.16;
     background: linear-gradient(90deg, #ff4040 0 33.3%, #40ff60 33.3% 66.6%, #4060ff 66.6%) 0 0 / var(--grille) 100% repeat;
   }
   .crt-roll {
-    z-index: 7; mix-blend-mode: screen; opacity: 0.5;
+    z-index: 7; mix-blend-mode: screen; opacity: 0.35;
     background: linear-gradient(180deg, transparent 0%, rgba(200, 255, 220, 0.05) 40%, rgba(200, 255, 220, 0.09) 50%, rgba(200, 255, 220, 0.05) 60%, transparent 100%) 0 0 / 100% 35% no-repeat;
     animation: crt-roll 9s linear infinite;
   }
   @keyframes crt-roll { from { background-position: 0 -40%; } to { background-position: 0 160%; } }
-  .tv.strong .crt-lines { opacity: 0.85; animation: crt-interlace 0.067s steps(1) infinite; }
+  .tv.strong .crt-lines { opacity: 0.78; animation: crt-interlace 0.067s steps(1) infinite; }
   .tv.strong .crt-grille { opacity: 0.26; }
   .tv.strong .crt-roll { opacity: 1; animation-duration: 5s; }
   .tv.strong .crt-bloom { opacity: 0.5; }
-  @keyframes crt-interlace { 50% { background-position: 0 calc(var(--line) / 2); } }
+  @keyframes crt-interlace { 50% { translate: 0 var(--gap); } }
   .tv-screen::after {
     content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
     background:
@@ -1073,7 +1071,7 @@
           <img id="tvArt" alt="" />
           <canvas class="tv-static" id="tvStatic" width="120" height="90"></canvas>
           <div class="tv-osd" id="tvOsd"></div>
-          <div class="crt-bloom"></div><div class="crt-lines"></div><div class="crt-grille"></div><div class="crt-roll"></div>
+          <div class="crt-bloom"></div><canvas class="crt-lines" id="tvLines" width="1" height="1"></canvas><div class="crt-grille"></div><div class="crt-roll"></div>
         </div>
         <span class="tv-brand">GROOVTRON</span>
       </div>
@@ -4131,7 +4129,7 @@ try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) t
 // grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
 const T = {
   layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"),
-  snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"),
+  snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"), lines: $("tvLines"),
 };
 
 function copyStylesTo(doc) {
@@ -4166,6 +4164,7 @@ async function openTV() {
       w.document.title = "Groovtron";
       w.document.body.classList.add("tv-pip");
       w.document.body.append(box);
+      w.addEventListener("resize", tvScanlines);
       w.document.addEventListener("keydown", tvKeys);
       tv.pip = w;
       w.addEventListener("pagehide", () => { T.layer.append(box); tv.pip = null; tvStopped(); });
@@ -4175,6 +4174,8 @@ async function openTV() {
     }
   }
   if (!tv.pip) { T.layer.classList.add("show"); T.layer.setAttribute("aria-hidden", "false"); }
+  tvScanlines();
+  setTimeout(tvScanlines, 800); // again once the power-on and fonts have settled
   tv.key = null;
   tvPower(true);
   tvTick();
@@ -4195,6 +4196,33 @@ function closeTV() {
 function tvStopped() {
   tv.open = false;
   clearInterval(tv.timer);
+}
+
+// scanlines, one canvas row per physical pixel and nudged onto the pixel grid, so they stay crisp lines at any
+// display scaling (100%, 125%, 150%, retina) instead of smearing into grey or flicker
+function tvScanlines() {
+  const win = T.screen.ownerDocument.defaultView;
+  const dpr = win.devicePixelRatio || 1;
+  const r = T.screen.getBoundingClientRect();
+  if (!r.height) return;
+  const H = Math.round(r.height * dpr) + 2;
+  const pitch = Math.max(dpr < 1.5 ? 2 : 3, Math.round((r.height * dpr) / 220)); // device pixels per line, ~220 lines
+  const gap = Math.max(1, Math.round(pitch * 0.4));
+  const c = T.lines;
+  c.width = 1;
+  c.height = H;
+  c.style.height = H / dpr + "px";
+  const ctx = c.getContext("2d");
+  for (let y = 0; y < H; y++) {
+    const i = y % pitch;
+    // lit rows, a softer row either side of the gap when there's room for one, then the dark gap
+    const v = i >= pitch - gap ? 58 : pitch >= 4 && (i === 0 || i === pitch - gap - 1) ? 190 : 255;
+    ctx.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+    ctx.fillRect(0, y, 1, 1);
+  }
+  const frac = (r.top * dpr) % 1; // the screen can sit between physical pixels; line the rows up anyway
+  c.style.transform = frac > 0.001 ? "translateY(" + (-frac / dpr).toFixed(4) + "px)" : "";
+  T.screen.style.setProperty("--gap", gap / dpr + "px");
 }
 
 function tvPower(on) {
@@ -4511,6 +4539,7 @@ T.box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => { b.onclick = () => tv
 T.box.querySelectorAll("[data-tv]").forEach((b) => { b.onclick = () => tvAction(b.dataset.tv); });
 T.layer.addEventListener("click", (e) => { if (e.target.id === "tvLayer") closeTV(); });
 document.addEventListener("keydown", tvKeys);
+addEventListener("resize", () => { if (tv.open && !tv.pip) tvScanlines(); });
 $("tvBtn").onclick = openTV;
 
 
