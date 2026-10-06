@@ -45,7 +45,7 @@
     text-rendering: optimizeLegibility;
   }
   #app {
-    position: relative; isolation: isolate; overflow: hidden;
+    position: relative; isolation: isolate; overflow: hidden; overflow: clip; /* clip: focus or scrollIntoView can't shove the card's content sideways */
     width: 100%; max-width: 21.25rem;
     background: var(--card);
     border: 1px solid var(--hairline);
@@ -264,6 +264,8 @@
     transition: transform 620ms var(--ease-back), opacity 160ms var(--ease), visibility 0s;
   }
   .bubble [hidden] { display: none; }
+  .bubble { overflow: hidden; overflow: clip; }
+  .ghost { pointer-events: none; }
   .bubble .lobby-head span {
     font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; letter-spacing: 0; text-transform: none; color: var(--cream); padding-left: 0;
     text-shadow: 1px 1px 0 var(--orange), 2px 2px 0 var(--pink);
@@ -322,15 +324,21 @@
   #modeBtn:disabled > i { display: none; }
   #modeList { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
   .mode-card {
-    display: grid; justify-items: start; align-content: start; gap: 0.125rem; text-align: left; min-height: 5.25rem; padding: 0.625rem;
+    position: relative; display: grid; justify-items: start; align-content: start; gap: 0.125rem; text-align: left; min-height: 5.25rem; padding: 0.625rem;
     border-radius: 1rem; background: var(--fill); box-shadow: inset 0 0 0 1px transparent;
+    transition: box-shadow 320ms var(--ease), opacity 320ms var(--ease), transform 100ms var(--ease);
   }
+  .mode-card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+    background: linear-gradient(135deg, rgba(255, 194, 61, 0.22), rgba(255, 122, 47, 0.14));
+    transition: opacity 320ms var(--ease);
+  }
+  .mode-card > * { position: relative; }
+  .mode-card[aria-checked="true"]::before { opacity: 1; }
   .mode-card i { font-style: normal; font-size: 1.25rem; line-height: 1.3; }
   .mode-card b { font-size: 0.8125rem; color: var(--cream); }
   .mode-card span { font-size: 0.625rem; font-weight: 600; line-height: 1.3; color: var(--label2); }
-  .mode-card[aria-checked="true"] {
-    background: linear-gradient(135deg, rgba(255, 194, 61, 0.22), rgba(255, 122, 47, 0.14)); box-shadow: inset 0 0 0 1.5px var(--mustard);
-  }
+  .mode-card[aria-checked="true"] { box-shadow: inset 0 0 0 1.5px var(--mustard); }
   .mode-card:disabled { opacity: 0.45; }
   .conf { display: grid; gap: 0.25rem; }
   .conf > span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); padding-left: 0.25rem; }
@@ -356,21 +364,60 @@
   #tlHead { display: flex; align-items: center; gap: 0.375rem; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; color: var(--label2); }
   #tlInfo { flex: 1; }
   #tlNew { min-height: 2rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.6875rem; }
-  #tlCards { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3125rem; max-height: 12.5rem; overflow-y: auto; overscroll-behavior: contain; padding: 0.125rem; }
+  /* the board: a felt panel with a rail running older → newer, cards sitting on it, + spots between them */
+  #tlBoard {
+    position: relative; border-radius: 1rem; padding: 0.375rem 0 1.25rem;
+    background:
+      radial-gradient(16rem 6rem at 50% 0%, rgba(255, 194, 61, 0.08), transparent 70%),
+      repeating-linear-gradient(90deg, rgba(251, 233, 208, 0.035) 0 1px, transparent 1px 1.5rem),
+      rgba(0, 0, 0, 0.36);
+    box-shadow: inset 0 0 0 1px var(--hairline), inset 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
+  }
+  #tlCards {
+    display: flex; align-items: center; gap: 0.25rem; min-height: 6rem; padding: 0.25rem 0.75rem;
+    overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+    background: linear-gradient(90deg, var(--plum), var(--pink), var(--orange), var(--mustard)) 0 50% / 100% 3px no-repeat local;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 0.75rem, #000 calc(100% - 0.75rem), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 0.75rem, #000 calc(100% - 0.75rem), transparent);
+  }
+  #tlCards::-webkit-scrollbar { display: none; }
+  #tlEnds {
+    position: absolute; left: 0.75rem; right: 0.75rem; bottom: 0.3125rem; display: flex; justify-content: space-between;
+    font-size: 0.5625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label3); pointer-events: none;
+  }
   #tlCards .slot {
-    width: 2.25rem; min-height: 2.75rem; padding: 0; border-radius: 0.75rem; font-size: 1rem; color: var(--ink);
-    background: linear-gradient(135deg, var(--mustard), var(--orange)); box-shadow: 0 0.25rem 0.75rem rgba(255, 122, 47, 0.3);
+    flex: none; width: 2.25rem; height: 2.25rem; min-height: 0; padding: 0; border-radius: 50%; font-size: 1rem; color: var(--ink);
+    background: linear-gradient(135deg, var(--mustard), var(--orange)); box-shadow: 0 0 0 3px rgba(18, 10, 14, 0.9), 0 0.25rem 0.75rem rgba(255, 122, 47, 0.4);
+    scroll-snap-align: center; animation: slot-in 360ms var(--ease-back) both;
   }
-  #tlCards .slot:disabled { background: transparent; box-shadow: none; width: 0.25rem; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
+  #tlCards .slot:disabled {
+    width: 0.5rem; height: 0.5rem; margin: 0 0.125rem; opacity: 1; font-size: 0; pointer-events: none; animation: none;
+    background: var(--label3); box-shadow: 0 0 0 3px rgba(18, 10, 14, 0.9);
+  }
+  @keyframes slot-in { from { transform: scale(0.3); opacity: 0; } }
   .tl-card {
-    display: grid; line-height: 1.15; min-height: 2.75rem; align-content: center; padding: 0.25rem 0.5rem; border-radius: 0.75rem;
-    background: var(--fill2); max-width: 6.5rem;
+    --c: var(--mustard);
+    flex: none; width: 4.5rem; height: 5.25rem; display: grid; grid-template-rows: auto 1fr auto; gap: 0.125rem;
+    padding: 0.375rem 0.4375rem; border-radius: 0.75rem; scroll-snap-align: center; line-height: 1.15;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 34%, #1d1117), color-mix(in srgb, var(--c) 12%, #1d1117));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 55%, transparent), 0 0.375rem 1rem rgba(0, 0, 0, 0.45);
   }
-  .tl-card b { font-family: var(--groovy); font-weight: 400; font-size: 0.9375rem; color: var(--cream); }
-  .tl-card span { font-size: 0.5625rem; font-weight: 600; color: var(--label2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tl-card.fresh { background: rgba(168, 224, 99, 0.18); box-shadow: inset 0 0 0 1.5px var(--ok); animation: tl-pop 520ms var(--ease-back); }
-  .tl-card.bad { background: rgba(255, 90, 79, 0.16); box-shadow: inset 0 0 0 1.5px var(--bad); animation: tl-pop 520ms var(--ease-back); }
-  .tl-card.bad b { color: var(--bad); text-decoration: line-through; }
+  .tl-card b { font-family: var(--groovy); font-weight: 400; font-size: 1.125rem; color: var(--c); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45); }
+  .tl-card span {
+    font-size: 0.5625rem; font-weight: 700; color: var(--cream); overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .tl-card small { font-size: 0.5rem; font-weight: 600; color: var(--label2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-card.fresh { box-shadow: inset 0 0 0 2px var(--ok), 0 0 1.25rem rgba(168, 224, 99, 0.45); animation: tl-pop 560ms var(--ease-back); }
+  .tl-card.bad { --c: var(--bad); box-shadow: inset 0 0 0 2px var(--bad), 0 0 1.25rem rgba(255, 90, 79, 0.4); animation: tl-pop 560ms var(--ease-back), tl-out 700ms var(--ease) 2.4s forwards; }
+  .tl-card.bad b { text-decoration: line-through; }
+  .tl-card.ghosty {
+    display: grid; place-items: center; text-align: center; background: transparent;
+    box-shadow: none; outline: 2px dashed var(--hairline); outline-offset: -2px; color: var(--label3);
+  }
+  .tl-card.ghosty b { color: var(--label3); font-size: 1.5rem; text-shadow: none; }
+  .tl-card.ghosty span { color: var(--label3); font-weight: 600; text-align: center; }
+  @keyframes tl-out { to { opacity: 0.35; } }
   @keyframes tl-pop { from { transform: scale(0.6); opacity: 0; } }
   .rel { display: grid; grid-template-columns: 2.75rem 1fr auto; align-items: center; gap: 0.5rem; padding: 0.3125rem; border-radius: 0.625rem; background: var(--fill); }
   .rel img { width: 2.75rem; height: 2.75rem; border-radius: 0.375rem; object-fit: cover; background: var(--fill2); }
@@ -531,7 +578,7 @@
     .bubble, .bubble.show { transform: none !important; }
     .bubble:not(.show), #radar:not(.show), #modes:not(.show) { opacity: 0; }
     .bubble.show { transition: opacity 200ms var(--ease), visibility 0s; }
-    .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad { animation: none; }
+    .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
   }
 </style>
 </head>
@@ -594,7 +641,10 @@
   </div>
   <div id="timeline">
     <div id="tlHead"><span id="tlInfo"></span><button id="tlNew" type="button">Restart</button></div>
-    <div id="tlCards" role="group" aria-label="Your timeline"></div>
+    <div id="tlBoard">
+      <div id="tlCards" role="group" aria-label="Your timeline"></div>
+      <div id="tlEnds" aria-hidden="true"><span>◂ older</span><span>newer ▸</span></div>
+    </div>
   </div>
   <div id="choices" role="group" aria-label="Choices">
     <div id="choiceLabel"></div>
@@ -698,6 +748,80 @@ function localPlayers() {
 
 const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+// smooth layout changes (switching modes, versus, choices arriving): the box eases to its new height,
+// what stays glides to its new spot, what leaves fades out where it was, what arrives fades in after it
+const MORPH_EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+const shown = (el) => el.getClientRects().length > 0;
+const appKids = () => [...els.app.children].filter((el) => !el.classList.contains("lava") && !el.classList.contains("ghost"));
+const modesKids = () => [...els.modeConf.children, els.modesNote];
+
+// an element counts as "the same" only if what's visible inside it is the same
+function morphSig(el) {
+  if (el.classList.contains("actions")) return [...el.children].filter(shown).map((b) => b.id).join();
+  if (el.id === "choices") return String(els.choiceList.children.length);
+  return "";
+}
+
+function morphAnim(el, frames, duration, delay = 0) {
+  const a = el.animate(frames, { duration, delay, easing: MORPH_EASE, fill: "backwards" });
+  a.id = "morph";
+  return a;
+}
+
+// a frozen copy of something that just left, fading out where it stood
+function morphGhost(box, c0, el, r0, displays) {
+  const g = el.cloneNode(true);
+  [g, ...g.querySelectorAll("*")].forEach((n, i) => { if (displays[i]) n.style.display = displays[i]; });
+  g.classList.add("ghost");
+  g.setAttribute("aria-hidden", "true");
+  g.inert = true;
+  Object.assign(g.style, {
+    position: "absolute", margin: "0", zIndex: "2",
+    left: (r0.left - c0.left - box.clientLeft) + "px", top: (r0.top - c0.top - box.clientTop) + "px",
+    width: r0.width + "px", height: r0.height + "px",
+  });
+  box.append(g);
+  const a = g.animate([{ opacity: 1 }, { opacity: 0, scale: "0.97" }], { duration: 200, easing: "ease-out", fill: "forwards" });
+  a.id = "morph";
+  a.onfinish = a.oncancel = () => g.remove();
+}
+
+const morphing = new Set(); // boxes mid-change: a nested switch (VS turning Hitster into Quiz) rides along
+
+function morph(box, kids, change) {
+  if (reduceMotion.matches || !box.animate || !shown(box) || morphing.has(box)) { change(); return; }
+  // a second switch mid-animation starts from wherever things are now
+  [box, ...kids()].forEach((el) => el.getAnimations().forEach((a) => { if (a.id === "morph") a.finish(); }));
+  box.querySelectorAll(":scope > .ghost").forEach((g) => g.remove());
+  const c0 = box.getBoundingClientRect();
+  const before = new Map();
+  for (const el of kids()) {
+    if (!shown(el)) continue;
+    const displays = [el, ...el.querySelectorAll("*")].map((n) => getComputedStyle(n).display);
+    before.set(el, { r: el.getBoundingClientRect(), sig: morphSig(el), displays });
+  }
+  morphing.add(box);
+  try { change(); } finally { morphing.delete(box); }
+  // measure the new layout completely before any animation pulls it back toward the old one
+  const c1 = box.getBoundingClientRect();
+  const after = kids().filter(shown).map((el) => [el, el.getBoundingClientRect()]);
+  const stays = new Set(after.map(([el]) => el));
+  if (Math.abs(c1.height - c0.height) > 0.5) morphAnim(box, [{ height: c0.height + "px" }, { height: c1.height + "px" }], 480);
+  for (const [el, b] of before) {
+    if (!stays.has(el) || morphSig(el) !== b.sig) morphGhost(box, c0, el, b.r, b.displays);
+  }
+  let n = 0;
+  for (const [el, r1] of after) {
+    const b = before.get(el);
+    if (b && morphSig(el) === b.sig) {
+      const dx = (b.r.left - c0.left) - (r1.left - c1.left), dy = (b.r.top - c0.top) - (r1.top - c1.top);
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) morphAnim(el, [{ translate: dx + "px " + dy + "px" }, { translate: "0 0" }], 480);
+    } else {
+      morphAnim(el, [{ opacity: 0, translate: "0 0.5rem", scale: "0.97" }, { opacity: 1, translate: "0 0", scale: "1" }], 380, 110 + 45 * n++);
+    }
+  }
+}
 
 window.addEventListener("error", (e) => {
   console.error("[gtt] JS error:", e.message, "at", e.filename + ":" + e.lineno);
@@ -1145,7 +1269,7 @@ function setupChoices(track) {
   const ready = fetchSpotifyPools(track);
   ready.then((pools) => {
     if (seq !== choiceSeq || state.revealed || state.track !== track) return;
-    buildChoices(pools, track);
+    morph(els.app, appKids, () => buildChoices(pools, track));
   }).catch(() => { if (seq === choiceSeq) choicesFallback(); });
 }
 
@@ -1834,7 +1958,11 @@ els.reconnect.onclick = async () => {
   if ("documentPictureInPicture" in window && documentPictureInPicture.window) documentPictureInPicture.window.close();
   await redirectToSpotify();
 };
-els.vsBtn.onclick = () => setVersus(!vs.on);
+els.vsBtn.onclick = () => {
+  const was = activeGame();
+  morph(els.app, appKids, () => setVersus(!vs.on));
+  if (activeGame() !== was) popModeBtn();
+};
 
 // ---------- lyrics (opt-in, from lrclib.net): a hint while guessing, karaoke after the reveal
 let lyricsOn = false;
@@ -2613,6 +2741,22 @@ function setGame(id) {
   if (!GAMES[id] || net.role === "guest") return;
   if (vs.on && SOLO_GAMES.includes(id)) return;
   const prev = game.id;
+  const inBubble = (fn) => (modes.open ? morph(els.modes, modesKids, fn) : fn());
+  morph(els.app, appKids, () => inBubble(() => switchGame(id, prev)));
+  if (prev !== id) popModeBtn();
+}
+
+function popModeBtn() {
+  if (reduceMotion.matches || !els.modeIcon.animate) return;
+  els.modeIcon.animate([{ opacity: 0, rotate: "-120deg", scale: "0.4" }, { opacity: 1, rotate: "0deg", scale: "1" }],
+    { duration: 560, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
+  els.modeName.parentNode.animate([{ opacity: 0, translate: "-0.75rem 0" }, { opacity: 1, translate: "0 0" }],
+    { duration: 420, delay: 60, easing: MORPH_EASE, fill: "backwards" });
+  const card = els.modeList.querySelector('[aria-checked="true"]');
+  if (card) card.animate([{ scale: "0.94" }, { scale: "1" }], { duration: 480, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
+}
+
+function switchGame(id, prev) {
   game.id = id;
   saveGame();
   state.choicesFailed = false;
@@ -2876,13 +3020,33 @@ function hitsterPlace(i) {
   renderModes();
 }
 
+// card colour by decade, oldest plum through to the 2020s
+const DECADE_COLORS = [[1960, "#b65aa5"], [1970, "#ff4f81"], [1980, "#ff7a2f"], [1990, "#ffc23d"], [2000, "#a8e063"], [2010, "#4fc3d8"], [Infinity, "#b38cff"]];
+
+function decadeColor(year) {
+  return DECADE_COLORS.find(([until]) => year < until)[1];
+}
+
 function renderTimeline() {
   if (activeGame() !== "hitster") return;
   const open = !!state.track && !state.revealed && !hs.over && !hsWon() && hs.cards.length > 0;
   const lost = Math.max(0, hs.maxLives - hs.lives);
   els.tlInfo.textContent = hs.cards.length + "/" + hs.target + " cards · " + "❤️".repeat(Math.max(0, hs.lives)) + "🖤".repeat(Math.min(lost, 5));
   els.tlNew.textContent = hs.over || hsWon() ? "New game" : "Restart";
+  const scroller = els.tlCards;
+  const keepLeft = scroller.scrollLeft;
   const items = [];
+  if (!hs.cards.length) {
+    // an empty board still looks like a board: this is where the starter card lands
+    const spot = document.createElement("div");
+    spot.className = "tl-card ghosty";
+    const q = document.createElement("b");
+    q.textContent = "?";
+    const t = document.createElement("span");
+    t.textContent = "next song is your free starter card";
+    spot.append(q, t);
+    items.push(spot);
+  }
   const miss = hs.last && !hs.last.ok && hs.last.key === state.trackKey ? hs.last.card : null;
   const missAt = miss ? hs.cards.filter((c) => c.year <= miss.year).length : -1;
   hs.cards.forEach((c, i) => {
@@ -2890,9 +3054,18 @@ function renderTimeline() {
     items.push(tlSlot(i, open));
     items.push(tlChip(c, hs.last && hs.last.ok && hs.last.key === c.key && c.key === state.trackKey ? "fresh" : ""));
   });
-  if (missAt === hs.cards.length) items.push(tlChip(miss, "bad"));
-  items.push(tlSlot(hs.cards.length, open));
-  els.tlCards.replaceChildren(...items);
+  if (hs.cards.length) {
+    if (missAt === hs.cards.length) items.push(tlChip(miss, "bad"));
+    items.push(tlSlot(hs.cards.length, open));
+  }
+  scroller.replaceChildren(...items);
+  // follow the action: centre the card that just landed (or missed), otherwise stay where you were
+  const focus = scroller.querySelector(".fresh, .bad");
+  scroller.scrollLeft = keepLeft;
+  if (focus) {
+    const left = focus.offsetLeft - scroller.clientWidth / 2 + focus.offsetWidth / 2;
+    scroller.scrollTo({ left, behavior: reduceMotion.matches ? "auto" : "smooth" });
+  }
 }
 
 function tlSlot(i, open) {
@@ -2901,6 +3074,7 @@ function tlSlot(i, open) {
   b.className = "slot";
   b.textContent = "＋";
   b.disabled = !open;
+  b.style.animationDelay = (i * 30) + "ms";
   b.setAttribute("aria-label", i === 0 ? "Place before everything" : i === hs.cards.length ? "Place after everything" : "Place between " + hs.cards[i - 1].year + " and " + hs.cards[i].year);
   b.onclick = () => hitsterPlace(i);
   return b;
@@ -2909,14 +3083,25 @@ function tlSlot(i, open) {
 function tlChip(c, cls) {
   const d = document.createElement("div");
   d.className = "tl-card" + (cls ? " " + cls : "");
-  d.title = c.song + " — " + c.artist;
+  if (cls !== "bad") d.style.setProperty("--c", decadeColor(c.year)); // a miss stays red
+  d.title = c.song + " — " + c.artist + " (" + c.year + ")";
   const y = document.createElement("b");
   y.textContent = c.year;
   const t = document.createElement("span");
   t.textContent = c.song;
-  d.append(y, t);
+  const a = document.createElement("small");
+  a.textContent = c.artist;
+  d.append(y, t, a);
   return d;
 }
+
+// a mouse wheel scrolls the board sideways when it's wider than the card
+els.tlCards.addEventListener("wheel", (e) => {
+  const sc = els.tlCards;
+  if (sc.scrollWidth <= sc.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  sc.scrollLeft += e.deltaY;
+  e.preventDefault();
+}, { passive: false });
 
 els.tlNew.onclick = () => {
   if (!hs.over && !hsWon() && hs.cards.length > 1 && Date.now() - restartArmedAt > 4000) {
@@ -2951,7 +3136,12 @@ function confRow(label, options, current, pick) {
     b.type = "button";
     b.textContent = text;
     b.setAttribute("aria-pressed", String(value === current));
-    b.onclick = () => { pick(value); saveGame(); renderModes(); };
+    b.onclick = () => {
+      for (const o of seg.children) o.setAttribute("aria-pressed", String(o === b));
+      morph(els.app, appKids, () => pick(value)); // e.g. Heardle's artist field coming or going
+      saveGame();
+      renderModes();
+    };
     seg.append(b);
   }
   row.append(name, seg);
@@ -2963,27 +3153,39 @@ function renderModes() {
   renderModeBtn();
   if (!modes.open) return;
   const cur = activeGame();
-  let fresh = 0;
-  els.modeList.replaceChildren(...Object.entries(GAMES).map(([id, g]) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "mode-card";
-    b.setAttribute("role", "radio");
-    b.setAttribute("aria-checked", String(id === cur));
+  if (!els.modeList.children.length) {
+    els.modeList.append(...Object.entries(GAMES).map(([id, g]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mode-card";
+      b.dataset.game = id;
+      b.setAttribute("role", "radio");
+      const icon = document.createElement("i");
+      icon.textContent = g.icon;
+      const name = document.createElement("b");
+      name.textContent = g.name;
+      b.append(icon, name, document.createElement("span"));
+      b.onclick = () => setGame(id);
+      return b;
+    }));
+  }
+  [...els.modeList.children].forEach((b, i) => {
+    const id = b.dataset.game;
     const locked = (vs.on || !!net.role) && SOLO_GAMES.includes(id);
+    b.setAttribute("aria-checked", String(id === cur));
     b.disabled = locked || net.role === "guest";
-    const icon = document.createElement("i");
-    icon.textContent = g.icon;
-    const name = document.createElement("b");
-    name.textContent = g.name;
-    const desc = document.createElement("span");
-    desc.textContent = locked ? "solo only — turn off VS to play" : g.desc;
-    b.append(icon, name, desc);
-    b.onclick = () => setGame(id);
-    if (modes.animate) { b.classList.add("in"); b.style.setProperty("--i", fresh++); }
-    return b;
-  }));
+    b.lastChild.textContent = locked ? "solo only — turn off VS to play" : GAMES[id].desc;
+    if (modes.animate) {
+      b.classList.remove("in");
+      void b.offsetWidth; // restart the slide-in
+      b.style.setProperty("--i", i);
+      b.classList.add("in");
+    }
+  });
   modes.animate = false;
+  renderModesNote(cur);
+  if (modes.confFor === cur) return;
+  modes.confFor = cur;
   const conf = [];
   if (cur === "heardle") {
     conf.push(confRow("Snippets", [["classic", "1 → 16s"], ["hard", "½ → 8s"], ["chill", "2 → 30s"]], game.heardle.ladder, (v) => {
@@ -3008,6 +3210,9 @@ function renderModes() {
     conf.push(confRow("Lyric hint 🎤", [[false, "Off"], [true, "On"]], lyricsOn, (v) => setLyricsOn(v)));
   }
   els.modeConf.replaceChildren(...conf);
+}
+
+function renderModesNote(cur) {
   els.modesNote.textContent = net.role === "guest" ? "the host picks the mode for the room"
     : cur === "heardle" ? "Heardle starts and pauses Spotify for you, so it needs Premium. Skip = next song, from second zero."
     : cur === "hitster" ? "Now: " + hs.cards.length + "/" + hs.target + " cards, " + hs.lives + (hs.lives === 1 ? " life" : " lives") + " left. Years come from Spotify's album dates, so remasters can fool you."
@@ -3019,6 +3224,7 @@ function setModesOpen(open) {
   if (open === modes.open) return;
   modes.open = open;
   modes.animate = open;
+  modes.confFor = null;
   if (open && narrowScreen()) setRadarOpen(false);
   renderModes();
   syncBubbles();
