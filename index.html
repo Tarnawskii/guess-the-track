@@ -148,13 +148,28 @@
   @keyframes ping { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3); opacity: 0; } }
   @keyframes pulse { 50% { opacity: 0.35; } }
   .stage { position: relative; display: flex; align-items: center; gap: 0.75rem; }
-  .deck { position: relative; width: 7.5rem; height: 7.5rem; flex: none; margin-right: 4rem; }
+  /* the deck: sleeve in front, record sliding out of it, and (solo) a tonearm riding the grooves */
+  .deck { --deck: 7.5rem; --shift: 4rem; position: relative; width: var(--deck); height: var(--deck); flex: none; margin-right: var(--shift); }
+  #app:not(.vs) .deck { --deck: 8.75rem; --shift: 4.75rem; margin-right: calc(var(--shift) + 1.25rem); }
   .record {
-    position: absolute; top: 0.25rem; left: 0.25rem; width: 7rem; height: 7rem; border-radius: 50%;
+    position: absolute; top: 0.25rem; left: 0.25rem; width: calc(var(--deck) - 0.5rem); height: calc(var(--deck) - 0.5rem); border-radius: 50%;
     transition: transform 600ms var(--ease-out);
     box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.55);
   }
-  .stage.live .record { transform: translateX(4rem); }
+  .stage.live .record { transform: translateX(var(--shift)); cursor: pointer; }
+  .tonearm { position: absolute; z-index: 2; left: calc(var(--deck) + var(--shift) + 0.25rem); top: 0.5rem; width: 0; height: 0; pointer-events: none; }
+  #app.vs .tonearm { display: none; }
+  .ta-base {
+    position: absolute; left: -0.8125rem; top: -0.8125rem; width: 1.625rem; height: 1.625rem; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fbe9d0, #b49a88 35%, #4a3a3c 72%, #2a1e22);
+    box-shadow: 0 0.3rem 0.6rem rgba(0, 0, 0, 0.55), inset 0 0 0 1.5px rgba(0, 0, 0, 0.3);
+  }
+  .ta-arm {
+    position: absolute; left: -1.25rem; top: -0.875rem; width: 2.5rem; height: 6.5rem; overflow: visible;
+    transform-origin: 1.25rem 0.875rem; transform: rotate(var(--arm, -9deg));
+    transition: transform 1100ms cubic-bezier(0.45, 0, 0.25, 1);
+    filter: drop-shadow(0 0.35rem 0.25rem rgba(0, 0, 0, 0.5));
+  }
   .record::after {
     content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
     background: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.14) 12%, transparent 17% 55%, rgba(255, 255, 255, 0.09) 60%, transparent 65%);
@@ -164,9 +179,7 @@
     background:
       radial-gradient(circle, transparent 0 34%, #0b0709 34% 36%, transparent 36%),
       repeating-radial-gradient(circle, #151013 0 1px, #221a1e 1px 3px);
-    animation: spin 1.8s linear infinite; animation-play-state: paused;
   }
-  .stage.playing .disc { animation-play-state: running; }
   @property --lab1 { syntax: "<color>"; inherits: true; initial-value: #ffc23d; }
   @property --lab2 { syntax: "<color>"; inherits: true; initial-value: #ff7a2f; }
   .disc-label {
@@ -253,7 +266,7 @@
   @keyframes fizzle { 40% { transform: scale(0.8, 1.1); opacity: 0.8; } to { transform: translateY(-0.625rem) scale(0.3); opacity: 0; } }
   @keyframes ember { 50% { box-shadow: 0 0 2rem rgba(255, 122, 47, 0.38); } }
   #app:not(.vs) .stage { justify-content: center; }
-  #app:not(.vs) .confetti { left: calc(50% - 2rem); }
+  #app:not(.vs) .confetti { left: calc(50% - 3rem); }
   .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
   #vsScore { display: none; }
   #app.vs #score { display: none; }
@@ -557,8 +570,11 @@
   #app.pick .field { display: none; }
   #app.pick #check { display: none; }
   #choiceLabel { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label2); text-align: center; min-height: 0.75rem; }
-  #choiceList { display: flex; flex-direction: column; gap: 0.375rem; }
-  #choiceList button { min-height: 2.25rem; text-align: left; padding: 0 0.75rem; line-height: 1.2; }
+  #choiceList { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(2.75rem, auto); gap: 0.375rem; }
+  #choiceList button {
+    min-height: 2.75rem; text-align: left; padding: 0.375rem 0.75rem; line-height: 1.2; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
   #choiceList button.pick-ok { background: rgba(168, 224, 99, 0.16); color: var(--ok); }
   #choiceList button.pick-bad { background: rgba(255, 90, 79, 0.16); color: var(--bad); }
   #choiceList button.pick-right { box-shadow: inset 0 0 0 2px var(--ok); color: var(--ok); }
@@ -637,7 +653,7 @@
     .confetti { display: none; }
     .flame.lit, .flame.pop, #stStreak.blaze { animation: none; }
     .flame.out { animation: none; opacity: 0; }
-    .cover-inner, .record, .field .v, .disc-label { transition: none; }
+    .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
     button:active { transform: none; }
     .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
   }
@@ -653,6 +669,8 @@
   <div class="lava" aria-hidden="true"><i></i><i></i><i></i></div>
   <svg class="sprite" aria-hidden="true" focusable="false">
     <defs>
+      <linearGradient id="taTube" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b5a55" /><stop offset="0.45" stop-color="#fbe9d0" /><stop offset="1" stop-color="#8a7266" /></linearGradient>
+      <linearGradient id="taMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbe9d0" /><stop offset="0.5" stop-color="#b49a88" /><stop offset="1" stop-color="#4a3a3c" /></linearGradient>
       <linearGradient id="flOuter" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4f81" /><stop offset="0.55" stop-color="#ff7a2f" /><stop offset="1" stop-color="#ffc23d" /></linearGradient>
       <linearGradient id="flCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd36a" /><stop offset="1" stop-color="#fff4c9" /></linearGradient>
       <symbol id="flameShape" viewBox="0 0 24 30">
@@ -670,7 +688,7 @@
     </div>
   </header>
   <div id="pills">
-    <button id="modeBtn" class="pill" type="button" aria-expanded="false" aria-haspopup="dialog" aria-controls="modes" title="Game mode — Quiz, Pick 5, Heardle or Hitster">
+    <button id="modeBtn" class="pill" type="button" aria-expanded="false" aria-haspopup="dialog" aria-controls="modes" title="Game mode — Quiz, Pick 6, Heardle or Hitster">
       <span id="modeIcon" class="pill-icon" aria-hidden="true">✍️</span><span class="pill-text"><b id="modeName">Quiz</b><small id="modeDesc">◂ game mode</small></span>
     </button>
     <button id="radarBtn" class="pill" type="button" aria-expanded="false" aria-haspopup="dialog" aria-controls="radar" title="Release radar — new music from your artists">
@@ -698,7 +716,21 @@
   </div>
   <div class="stage" id="stage">
     <div class="deck">
-      <div class="record" aria-hidden="true"><div class="disc"><div class="disc-label" id="discLabel"></div></div></div>
+      <div class="record" id="record" aria-hidden="true" title="Tap the record to pause or play"><div class="disc" id="disc"><div class="disc-label" id="discLabel"></div></div></div>
+      <div class="tonearm" aria-hidden="true">
+        <i class="ta-base"></i>
+        <svg class="ta-arm" viewBox="0 0 40 104">
+          <rect x="13.5" y="0" width="13" height="9" rx="3" fill="url(#taMetal)" />
+          <path d="M20 9 L20 80 Q20 87 15.5 91" fill="none" stroke="url(#taTube)" stroke-width="3.4" stroke-linecap="round" />
+          <g transform="rotate(24 15.5 94)">
+            <rect x="10.5" y="88.5" width="10" height="11.5" rx="1.75" fill="url(#taMetal)" />
+            <rect x="12.5" y="97.5" width="6" height="3.5" rx="0.75" fill="#2a0e12" />
+            <path d="M20.5 90.5 l5 -2.5" stroke="#b49a88" stroke-width="1.6" stroke-linecap="round" />
+          </g>
+          <circle cx="20" cy="14" r="4.75" fill="url(#taMetal)" stroke="rgba(0,0,0,0.35)" stroke-width="0.75" />
+          <circle cx="20" cy="14" r="1.6" fill="#2a0e12" />
+        </svg>
+      </div>
       <div id="cover">
         <div class="cover-inner">
           <div class="cover-face cover-front">?</div>
@@ -957,8 +989,77 @@ function setLiveOpen(open) {
   els.liveBtn.setAttribute("aria-expanded", String(open));
 }
 
+// ---------- the turntable: inertia on the platter, a tonearm that tracks the song, tap to pause/play
+const vinyl = { anim: null, rate: 0, target: 0, raf: 0, boostUntil: 0 };
+
+function vinylAnim() {
+  if (!vinyl.anim && !reduceMotion.matches) {
+    const disc = $("disc");
+    if (disc && disc.animate) {
+      vinyl.anim = disc.animate([{ rotate: "0deg" }, { rotate: "360deg" }], { duration: 1800, iterations: Infinity }); // ~33⅓ rpm
+      vinyl.anim.playbackRate = 0;
+    }
+  }
+  return vinyl.anim;
+}
+
+// spin up quick, coast down slow, like a real platter
+function vinylStep() {
+  const a = vinylAnim();
+  if (!a) { vinyl.raf = 0; return; }
+  const boosting = Date.now() < vinyl.boostUntil;
+  const goal = boosting ? 3.2 : vinyl.target;
+  vinyl.rate += (goal - vinyl.rate) * (goal > vinyl.rate ? 0.07 : 0.03);
+  if (Math.abs(goal - vinyl.rate) < 0.004) vinyl.rate = goal;
+  a.playbackRate = vinyl.rate;
+  const settled = vinyl.rate === goal && !boosting;
+  vinyl.raf = settled ? 0 : els.app.ownerDocument.defaultView.requestAnimationFrame(vinylStep);
+}
+
+function vinylGo() {
+  if (!vinyl.raf) vinyl.raf = els.app.ownerDocument.defaultView.requestAnimationFrame(vinylStep);
+}
+
+function vinylBoost() {
+  vinyl.boostUntil = Date.now() + 700;
+  vinylGo();
+}
+
+// the arm rests off the record when nothing plays; playing, it sits in the groove and creeps inward with the song
+function updateArm(progress) {
+  const playing = els.stage.classList.contains("playing") && !!state.track;
+  const p = Math.min(1, Math.max(0, progress == null ? (state.trackDuration ? currentElapsed() / state.trackDuration : 0) : progress));
+  els.stage.style.setProperty("--arm", (playing ? 10 + 24 * p : -9).toFixed(2) + "deg");
+}
+
+function currentElapsed() {
+  return state.pos ? state.pos.position_ms + (Date.now() - state.pos.timestamp_ms) * (state.pos.speed || 0) : 0;
+}
+
 function setPlaying(on) {
   els.stage.classList.toggle("playing", on);
+  vinyl.target = on ? 1 : 0;
+  vinylGo();
+  updateArm();
+}
+
+async function toggleVinyl() {
+  if (net.role === "guest" || state.mode !== "spotify" || !state.track) return;
+  if (activeGame() === "heardle") { setStatus("in Heardle the snippets decide when it plays"); return; }
+  const playing = els.stage.classList.contains("playing");
+  const at = currentElapsed();
+  setPlaying(!playing); // the platter and the arm react right away
+  let res = null;
+  try { res = await playerCall(playing ? "pause" : "play"); } catch {}
+  if (!res || !res.ok) {
+    setPlaying(playing);
+    setStatus(!res ? "couldn't reach Spotify" : res.status === 403 ? "pausing from here needs Spotify Premium"
+      : res.status === 404 ? "no active Spotify player — press play in Spotify first" : "couldn't " + (playing ? "pause" : "play") + " (" + res.status + ")");
+    return;
+  }
+  state.pos = { position_ms: at, timestamp_ms: Date.now(), speed: playing ? 0 : 1 };
+  state.tapHold = Date.now() + 1500;
+  setTimeout(pollSpotify, 1600);
 }
 
 function setStatus(text, win) {
@@ -1023,6 +1124,7 @@ function setProgress(elapsed, total) {
   els.progress.style.transform = "scaleX(" + p.toFixed(4) + ")";
   els.tNow.textContent = fmt(Math.min(elapsed, total));
   els.tTotal.textContent = fmt(total);
+  updateArm(p);
 }
 
 // the streak in flames: one lights (with a pop) per song in a row, up to five; a broken streak fizzles out
@@ -1132,6 +1234,7 @@ function popPoints(n, statEl = els.stPoints) {
 }
 
 function burst() {
+  vinylBoost(); // a victory spin
   if (reduceMotion.matches) return;
   const colors = ["var(--mustard)", "var(--orange)", "var(--pink)", "var(--ok)", "var(--cream)"];
   for (let i = 0; i < 16; i++) {
@@ -1469,7 +1572,7 @@ function buildOptions(accepted, pool) {
     if (!n || seen.has(n)) continue;
     seen.add(n);
     opts.push(s);
-    if (opts.length >= 5) break;
+    if (opts.length >= 6) break;
   }
   return shuffled(opts);
 }
@@ -1863,9 +1966,12 @@ async function pollSpotify() {
       else return;
     }
     if (key !== state.trackKey) newRound(trackFromItem(item), key);
-    setPlaying(!!data.is_playing);
     state.trackDuration = item.duration_ms || 0;
-    state.pos = { position_ms: data.progress_ms || 0, timestamp_ms: Date.now(), speed: data.is_playing ? 1 : 0 };
+    // right after a tap on the record, Spotify may not have caught up yet: trust the tap for a moment
+    if (Date.now() > (state.tapHold || 0)) {
+      setPlaying(!!data.is_playing);
+      state.pos = { position_ms: data.progress_ms || 0, timestamp_ms: Date.now(), speed: data.is_playing ? 1 : 0 };
+    }
     netSendPos();
   } catch (e) {
     setStatus("connection glitch — retrying");
@@ -2090,6 +2196,7 @@ els.reconnect.onclick = async () => {
   if ("documentPictureInPicture" in window && documentPictureInPicture.window) documentPictureInPicture.window.close();
   await redirectToSpotify();
 };
+$("record").addEventListener("click", toggleVinyl);
 els.liveBtn.onclick = () => { clearTimeout(liveFlash); setLiveOpen(!els.live.classList.contains("open")); };
 document.addEventListener("pointerdown", (e) => { if (!els.live.contains(e.target)) setLiveOpen(false); });
 
@@ -2534,7 +2641,7 @@ function onGuestData(msg) {
     case "choices":
       if (msg.key !== state.trackKey || state.revealed) break;
       if (msg.failed || !Array.isArray(msg.opts)) { state.choicesFailed = true; applyInputUI(); break; }
-      state.choice = { stage: 0, opts: msg.opts.slice(0, 3).map((o) => (Array.isArray(o) ? o.slice(0, 5).map((x) => str(x)) : [])), accepted: null, results: [], picks: [] };
+      state.choice = { stage: 0, opts: msg.opts.slice(0, 3).map((o) => (Array.isArray(o) ? o.slice(0, 6).map((x) => str(x)) : [])), accepted: null, results: [], picks: [] };
       applyInputUI();
       if (!net.myLocked) renderStage();
       break;
@@ -2794,7 +2901,7 @@ function renderLobby() {
     const name = document.createElement("b");
     name.textContent = r.name + "'s room";
     const meta = document.createElement("span");
-    meta.textContent = r.players + (r.players === 1 ? " player" : " playing") + " · " + (r.imode === "pick" ? "Pick 5" : "Type")
+    meta.textContent = r.players + (r.players === 1 ? " player" : " playing") + " · " + (r.imode === "pick" ? "Pick 6" : "Type")
       + " · " + (r.jam ? "🎧 Jam" : "no Jam yet");
     txt.append(name, meta);
     const b = document.createElement("button");
@@ -2823,10 +2930,10 @@ els.lobbyRefresh.onclick = scanRooms;
 els.lobbyClose.onclick = () => setLobbyOpen(false);
 els.lobbyLogin.onclick = () => { location.href = location.pathname; };
 
-// ---------- game modes: Quiz and Pick 5 (versus too), Heardle and Hitster (solo) ----------
+// ---------- game modes: Quiz and Pick 6 (versus too), Heardle and Hitster (solo) ----------
 const GAMES = {
   quiz: { icon: "✍️", name: "Quiz", short: "type artist · song · year", desc: "Type the artist, song and year" },
-  pick: { icon: "🖐", name: "Pick 5", short: "multiple choice, 3 steps", desc: "Pick from 5 — artist, song, then year" },
+  pick: { icon: "🎲", name: "Pick 6", short: "multiple choice, 3 steps", desc: "Pick from 6 — artist, song, then year" },
   heardle: { icon: "⏱", name: "Heardle", short: "name it from the first seconds", desc: "1 second of intro, then a bit more. Needs Premium" },
   hitster: { icon: "🃏", name: "Hitster", short: "place songs on your timeline", desc: "Before or after? Build a timeline of years" },
 };
@@ -2849,7 +2956,7 @@ function saveGame() {
   try { localStorage.setItem("gtt_game", JSON.stringify(game)); } catch {}
 }
 
-// versus (and every guest) only plays Quiz or Pick 5
+// versus (and every guest) only plays Quiz or Pick 6
 function activeGame() {
   if (vs.on || net.role) return state.imode === "pick" ? "pick" : "quiz";
   return game.id;
@@ -3402,7 +3509,7 @@ function renderModesNote(cur) {
   els.modesNote.textContent = net.role === "guest" ? "the host picks the mode for the room"
     : cur === "heardle" ? "Heardle starts and pauses Spotify for you, so it needs Premium. Skip = next song, from second zero."
     : cur === "hitster" ? "Now: " + hs.cards.length + "/" + hs.target + " cards, " + hs.lives + (hs.lives === 1 ? " life" : " lives") + " left. Years come from Spotify's album dates, so remasters can fool you."
-    : vs.on ? "Heardle and Hitster are solo for now — versus plays Quiz or Pick 5."
+    : vs.on ? "Heardle and Hitster are solo for now — versus plays Quiz or Pick 6."
     : "";
 }
 
