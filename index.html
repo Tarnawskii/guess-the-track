@@ -6,7 +6,7 @@
 <title>Guess The Track</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=VT323&display=swap" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -113,6 +113,7 @@
   #menu.open .menu-item { animation: menu-in 320ms var(--ease-out) both; }
   #menu.open .menu-item:nth-child(2) { animation-delay: 40ms; }
   #menu.open .menu-item:nth-child(3) { animation-delay: 80ms; }
+  #menu.open .menu-item:nth-child(4) { animation-delay: 120ms; }
   @keyframes menu-in { from { opacity: 0; transform: translateY(-0.375rem); } }
   .menu-item {
     display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: 0.625rem; width: 100%;
@@ -704,6 +705,161 @@
   #choiceList button.pick-sel:disabled { opacity: 1; }
   footer { font-size: 0.6875rem; color: var(--label3); text-align: center; letter-spacing: 0.03em; }
   kbd { font: inherit; font-weight: 700; color: var(--label2); padding: 0 0.25rem; border-radius: 0.25rem; background: var(--fill); }
+  /* ---------- Just listen: an 80s/90s plastic TV (sized in cqw so it scales with its pop-out window) ---------- */
+  #tvLayer {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem;
+    background: rgba(8, 4, 6, 0.74); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    opacity: 0; visibility: hidden; transition: opacity 300ms var(--ease), visibility 0s linear 300ms;
+  }
+  #tvLayer.show { opacity: 1; visibility: visible; transition: opacity 300ms var(--ease), visibility 0s; }
+  body.tv-pip { display: grid; place-items: center; min-height: 100vh; padding: 0.5rem; background: #0c090b; }
+  .tv { width: min(32rem, 94vw); container-type: inline-size; font-family: "VT323", ui-monospace, Menlo, monospace; -webkit-user-select: none; user-select: none; }
+  body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
+  .tv-body {
+    position: relative; padding: 4cqw 4cqw 3cqw; border-radius: 5cqw 5cqw 4cqw 4cqw;
+    background: linear-gradient(180deg, #55525c 0%, #34323a 6%, #29272e 55%, #1e1d22 100%);
+    box-shadow: inset 0 0.3cqw 0 rgba(255, 255, 255, 0.18), inset 0 -1cqw 2cqw rgba(0, 0, 0, 0.5), 0 3cqw 7cqw rgba(0, 0, 0, 0.65);
+  }
+  .tv-body::before, .tv-body::after { content: ""; position: absolute; bottom: -1.4cqw; width: 12cqw; height: 1.6cqw; border-radius: 0 0 1cqw 1cqw; background: #141317; }
+  .tv-body::before { left: 12cqw; }
+  .tv-body::after { right: 12cqw; }
+  .tv-bezel {
+    padding: 3cqw; border-radius: 4cqw; background: #121114;
+    box-shadow: inset 0 0 0 0.4cqw #0a090b, inset 0 1cqw 2cqw rgba(0, 0, 0, 0.85), 0 0.3cqw 0 rgba(255, 255, 255, 0.07);
+  }
+  .tv-screen {
+    position: relative; aspect-ratio: 4 / 3; overflow: hidden; isolation: isolate; border-radius: 9% / 12%;
+    background: radial-gradient(ellipse at 50% 45%, #0f1d18, #050a08 75%); color: #d6ffe6; font-size: 5cqw; line-height: 1.05;
+    box-shadow: inset 0 0 6cqw rgba(0, 0, 0, 0.9);
+    text-shadow: 0 0 0.7cqw currentColor, 0.22cqw 0 0 rgba(255, 30, 80, 0.35), -0.22cqw 0 0 rgba(0, 170, 255, 0.35);
+  }
+  .tv-screen::before {
+    content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.045) 0 1px, rgba(0, 255, 0, 0.035) 1px 2px, rgba(0, 0, 255, 0.045) 2px 3px);
+  }
+  .tv-screen::after {
+    content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.6) 100%),
+      linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 22%, transparent 34%);
+  }
+  .tv.strong .tv-screen::before { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.08) 0 1px, rgba(0, 255, 0, 0.06) 1px 2px, rgba(0, 0, 255, 0.08) 2px 3px); }
+  .tv.strong .tv-content { animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite; }
+  .tv.strong .tv-screen { text-shadow: 0 0 1cqw currentColor, 0.45cqw 0 0 rgba(255, 30, 80, 0.45), -0.45cqw 0 0 rgba(0, 170, 255, 0.45); }
+  @keyframes tv-flicker { 50% { opacity: 0.94; } }
+  @keyframes tv-jitter { 0%, 92%, 100% { transform: none; } 94% { transform: translateX(0.4cqw) skewX(-1deg); } 96% { transform: translateX(-0.3cqw); } }
+  .tv-content { position: absolute; inset: 0; transform-origin: 50% 50%; }
+  .tv-screen.power-on .tv-content { animation: tv-on 750ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .tv-screen.power-off .tv-content { animation: tv-off 420ms cubic-bezier(0.6, 0, 0.8, 0.4) both; }
+  @keyframes tv-on {
+    0% { transform: scale(0.02, 0.004); filter: brightness(6); }
+    35% { transform: scale(1, 0.006); filter: brightness(5); }
+    100% { transform: none; filter: none; }
+  }
+  @keyframes tv-off {
+    0% { transform: none; filter: none; }
+    55% { transform: scale(1, 0.006); filter: brightness(5); }
+    100% { transform: scale(0, 0.004); filter: brightness(8); opacity: 0; }
+  }
+  .tv-static { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; opacity: 0; pointer-events: none; image-rendering: pixelated; transition: opacity 260ms var(--ease); }
+  .tv-static.burst { opacity: 0.9; transition: none; }
+  .tv-osd {
+    position: absolute; z-index: 8; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
+    color: #4dff86; font-size: 6.5cqw; letter-spacing: 0.06em;
+    opacity: 0; transition: opacity 500ms var(--ease);
+  }
+  .tv-osd.show { opacity: 1; transition: none; }
+  .tv-ch { position: absolute; inset: 0; display: none; padding: 7cqw 9cqw; }
+  .tv[data-ch="1"] #tvNow, .tv[data-ch="2"] #tvNew, .tv[data-ch="3"] #tvQueue { display: flex; }
+  /* CH1: now playing, VHS style */
+  #tvNow { flex-direction: column; justify-content: space-between; }
+  .vhs-top { display: flex; justify-content: space-between; font-size: 5.5cqw; color: #fff; }
+  .vhs-top .pause { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .now-main { display: grid; grid-template-columns: 30cqw 1fr; gap: 4cqw; align-items: center; min-height: 0; }
+  .now-slot { width: 30cqw; aspect-ratio: 1; }
+  /* the cover sits above the screen effects, untouched (Spotify's artwork rules: no filters, overlays or animation on it) */
+  #tvArt {
+    position: absolute; z-index: 7; width: 30cqw; aspect-ratio: 1; border-radius: 1.2cqw; object-fit: cover;
+    display: none; opacity: 1; transition: opacity 400ms var(--ease);
+  }
+  .tv[data-ch="1"] #tvArt.has { display: block; }
+  .tv-screen.power-on #tvArt, .tv-screen.power-off #tvArt, .tv-screen.snowing #tvArt { opacity: 0; transition: none; }
+  .vhs-bottom a { color: #1ed760; text-decoration: none; font-size: 4.6cqw; }
+  .now-text { display: grid; gap: 1.2cqw; min-width: 0; }
+  .now-song { font-size: 7cqw; color: #ffe95c; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .now-artist { font-size: 5.5cqw; color: #7ff6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now-album { font-size: 4.5cqw; color: #9fb7aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vhs-bottom { display: flex; align-items: center; gap: 2.5cqw; font-size: 5.5cqw; color: #fff; }
+  .vhs-bar {
+    position: relative; flex: 1; height: 3.2cqw; min-width: 0;
+    background: repeating-linear-gradient(90deg, rgba(77, 255, 134, 0.22) 0 1.8cqw, transparent 1.8cqw 2.6cqw);
+  }
+  .vhs-bar::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p, 0%);
+    background: repeating-linear-gradient(90deg, #4dff86 0 1.8cqw, transparent 1.8cqw 2.6cqw);
+    filter: drop-shadow(0 0 0.6cqw rgba(77, 255, 134, 0.7));
+  }
+  /* CH2: lyrics */
+  .testcard { position: absolute; inset: 0; display: grid; grid-template-rows: 1fr auto; }
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .bars i { display: block; }
+  .bars i:nth-child(1) { background: #c0c0c0; } .bars i:nth-child(2) { background: #c0c000; } .bars i:nth-child(3) { background: #00c0c0; }
+  .bars i:nth-child(4) { background: #00c000; } .bars i:nth-child(5) { background: #c000c0; } .bars i:nth-child(6) { background: #c00000; } .bars i:nth-child(7) { background: #0000c0; }
+  .testcard b {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); padding: 1.5cqw 4cqw; background: #000; color: #fff;
+    font-size: 6.5cqw; font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; text-shadow: none;
+  }
+  .testcard span { height: 18%; background: linear-gradient(90deg, #000 0 25%, #fff 25% 50%, #222 50% 75%, #111 75%); }
+  /* CH3: the queue as a teletext page */
+  #tvQueue, #tvNew { flex-direction: column; gap: 1cqw; padding: 6.5cqw 8cqw; background: #000; font-size: 4.6cqw; text-shadow: 0 0 0.5cqw currentColor; }
+  .tt-head { display: flex; justify-content: space-between; color: #fff; }
+  .tt-head b { font-weight: 400; color: #ffff3d; }
+  .tt-title { padding: 0.4cqw 2cqw; background: #0015d6; color: #ffff3d; font-size: 7cqw; letter-spacing: 0.08em; }
+  .tt-list { display: grid; gap: 0.2cqw; flex: 1; min-height: 0; overflow: hidden; }
+  .tt-row {
+    display: grid; grid-template-columns: 4.5cqw 1fr; gap: 1.5cqw; min-height: 0; padding: 0.2cqw 0.6cqw; text-align: left;
+    font: inherit; color: #fff; background: transparent; border-radius: 0; cursor: pointer; text-shadow: inherit;
+  }
+  .tt-row:hover, .tt-row:focus-visible { background: #0015d6; outline: none; }
+  .tt-row i { font-style: normal; color: #3dffff; }
+  .tt-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tt-row em { font-style: normal; color: #3dff3d; }
+  .tt-row small { font-size: inherit; color: #ff3dff; }
+  .tt-empty { color: #ff3dff; }
+  .fastext { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
+  .fastext button {
+    min-height: 0; padding: 0.4cqw 0; border-radius: 0; font: inherit; font-size: 4.2cqw; color: #000; text-shadow: none; cursor: pointer;
+  }
+  .fastext button:nth-child(1) { background: #ff2a2a; } .fastext button:nth-child(2) { background: #2aff2a; }
+  .fastext button:nth-child(3) { background: #ffff2a; } .fastext button:nth-child(4) { background: #2affff; }
+  /* the control strip under the screen */
+  .tv-panel { display: flex; align-items: center; gap: 2.2cqw; margin-top: 3cqw; padding: 0 1cqw; }
+  .tv-brand {
+    font: 800 3.2cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; letter-spacing: 0.32em;
+    background: linear-gradient(180deg, #f2eff5, #8a8590); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tv-grille { flex: 1; height: 4.6cqw; border-radius: 1cqw; background: repeating-linear-gradient(90deg, #121114 0 0.7cqw, transparent 0.7cqw 1.6cqw); opacity: 0.85; }
+  .tv-btns { display: flex; gap: 1.1cqw; }
+  .tv-btn {
+    width: 6.6cqw; height: 5cqw; min-height: 0; padding: 0; border-radius: 0.9cqw;
+    font: 700 2.9cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #d8d3dc;
+    background: linear-gradient(180deg, #4d4a54, #2a292f); box-shadow: 0 0.45cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.16);
+    transition: transform 80ms var(--ease), box-shadow 80ms var(--ease), color 150ms var(--ease);
+  }
+  .tv-btn:active { transform: translateY(0.35cqw); box-shadow: 0 0.1cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.1); }
+  @media (hover: hover) and (pointer: fine) { .tv-btn:hover { background: linear-gradient(180deg, #57545e, #303036); } }
+  .tv-btn[aria-pressed="true"] { color: #ffc23d; }
+  .tv-power {
+    position: relative; width: 6cqw; height: 6cqw; min-height: 0; padding: 0; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #5a5762, #232227); box-shadow: 0 0.45cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.16);
+    color: #d8d3dc; font-size: 3cqw;
+  }
+  .tv-led { width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: #3dff7a; box-shadow: 0 0 1.2cqw #3dff7a; }
+  .tv-led.standby { background: #ff3b30; box-shadow: 0 0 1.2cqw #ff3b30; }
+  #app.guest #tvBtn, #app.lobby #tvBtn { display: none; }
   @media (prefers-reduced-motion: reduce) {
     .lava i, .disc, .led, .led::after, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
     .confetti { display: none; }
@@ -711,6 +867,7 @@
     .flame.out { animation: none; opacity: 0; }
     .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
     #cover.flipped .cover-back img, #ambient i { animation: none; }
+    .tv .tv-content, .tv.strong .tv-content, .vhs-top .pause { animation: none; }
     button:active { transform: none; }
     .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
   }
@@ -748,6 +905,7 @@
       <div id="menu" role="group" aria-label="Settings">
         <button id="lyrBtn" class="menu-item" type="button" aria-pressed="false"><span class="mi-icon" aria-hidden="true">🎤</span><span class="mi-text"><b>Lyric hints</b><small>from lrclib.net, karaoke after</small></span><span class="switch" aria-hidden="true"></span></button>
         <button id="vsBtn" class="menu-item" type="button" aria-pressed="false"><span class="mi-icon" aria-hidden="true">VS</span><span class="mi-text"><b>Versus</b><small>same device, or online with your Jam</small></span><span class="switch" aria-hidden="true"></span></button>
+        <button id="tvBtn" class="menu-item" type="button"><span class="mi-icon" aria-hidden="true">📺</span><span class="mi-text"><b>Just listen</b><small>retro TV · queue · new releases</small></span><span class="mi-go" aria-hidden="true">↗</span></button>
         <button id="pipBtn" class="menu-item" type="button"><span class="mi-icon" aria-hidden="true">⧉</span><span class="mi-text"><b>Pop-out widget</b><small>always on top · Chrome/Edge</small></span><span class="mi-go" aria-hidden="true">↗</span></button>
       </div>
     </div>
@@ -856,6 +1014,39 @@
     <div id="radarList"></div>
     <div id="radarNote"></div>
     <button id="radarLogin" type="button" hidden>Let Spotify show who you play most</button>
+  </div>
+</div>
+<div id="tvLayer" aria-hidden="true">
+  <div class="tv" id="tv" data-ch="1" role="dialog" aria-label="Just listen — retro TV">
+    <div class="tv-body">
+      <div class="tv-bezel">
+        <div class="tv-screen" id="tvScreen">
+          <div class="tv-content">
+            <div class="tv-ch" id="tvNow"></div>
+            <div class="tv-ch" id="tvNew"></div>
+            <div class="tv-ch" id="tvQueue"></div>
+          </div>
+          <img id="tvArt" alt="" />
+          <canvas class="tv-static" id="tvStatic" width="120" height="90"></canvas>
+          <div class="tv-osd" id="tvOsd"></div>
+        </div>
+      </div>
+      <div class="tv-panel">
+        <span class="tv-brand">GROOVTRON</span>
+        <span class="tv-grille" aria-hidden="true"></span>
+        <div class="tv-btns">
+          <button class="tv-btn" type="button" data-ch="1" aria-pressed="true" title="Channel 1 — now playing">1</button>
+          <button class="tv-btn" type="button" data-ch="2" aria-pressed="false" title="Channel 2 — new releases from your radar">2</button>
+          <button class="tv-btn" type="button" data-ch="3" aria-pressed="false" title="Channel 3 — queue">3</button>
+          <button class="tv-btn" type="button" data-tv="prev" title="Previous song" aria-label="Previous song">⏮</button>
+          <button class="tv-btn" type="button" data-tv="play" title="Play / pause" aria-label="Play or pause">⏯</button>
+          <button class="tv-btn" type="button" data-tv="next" title="Next song" aria-label="Next song">⏭</button>
+          <button class="tv-btn" type="button" data-tv="fx" aria-pressed="false" title="Stronger CRT effect">FX</button>
+        </div>
+        <span class="tv-led" id="tvLed" aria-hidden="true"></span>
+        <button class="tv-power" type="button" data-tv="power" title="Turn off" aria-label="Turn off the TV">⏻</button>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -2030,6 +2221,7 @@ function trackFromItem(item) {
     third: { label: "year", answer: parseInt(((item.album && item.album.release_date) || "0").slice(0, 4), 10) },
     artUrl: (item.album && item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
     albumId: item.album ? item.album.id : null,
+    url: item.external_urls ? item.external_urls.spotify : "",
     album: item.album ? item.album.name : "",
     duration: item.duration_ms || 0,
   };
@@ -3885,6 +4077,363 @@ function radarEscape(e) {
 document.addEventListener("keydown", radarEscape);
 // the new permissions need a fresh login, which goes through reconnect's "scores will reset" guard
 els.radarLogin.onclick = () => { sessionStorage.setItem("gtt_radar_login", "1"); els.reconnect.onclick(); };
+// ---------- Just listen: the retro TV (its own pop-out window, or a full-page overlay where there's no PiP) ----------
+const tv = { open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
+try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; } catch {}
+const TV_CHANNELS = { 1: "NOW", 2: "NEW", 3: "QUEUE" };
+// grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
+const T = {
+  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), art: $("tvArt"),
+  snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"),
+};
+
+function copyStylesTo(doc) {
+  for (const sheet of document.styleSheets) {
+    try {
+      const style = doc.createElement("style");
+      style.textContent = Array.from(sheet.cssRules).map((r) => r.cssText).join("\n");
+      doc.head.appendChild(style);
+    } catch {
+      if (!sheet.href) continue;
+      const link = doc.createElement("link");
+      link.rel = "stylesheet"; link.href = sheet.href;
+      doc.head.appendChild(link);
+    }
+  }
+}
+
+async function openTV() {
+  setMenuOpen(false);
+  if (tv.open || state.mode !== "spotify") return;
+  if (activeGame() === "heardle") setGame("quiz"); // Heardle would keep pausing the music
+  tv.open = true;
+  const box = T.box;
+  box.classList.toggle("strong", tv.fx);
+  box.querySelector('[data-tv="fx"]').setAttribute("aria-pressed", String(tv.fx));
+  if ("documentPictureInPicture" in window) {
+    try {
+      if (documentPictureInPicture.window) documentPictureInPicture.window.close(); // one pop-out at a time
+      const w = await documentPictureInPicture.requestWindow({ width: 440, height: 400 });
+      copyStylesTo(w.document);
+      w.document.title = "Groovtron";
+      w.document.body.classList.add("tv-pip");
+      w.document.body.append(box);
+      w.document.addEventListener("keydown", tvKeys);
+      tv.pip = w;
+      w.addEventListener("pagehide", () => { T.layer.append(box); tv.pip = null; tvStopped(); });
+    } catch (e) {
+      console.error("[gtt] tv pip", e);
+      tv.pip = null;
+    }
+  }
+  if (!tv.pip) { T.layer.classList.add("show"); T.layer.setAttribute("aria-hidden", "false"); }
+  tv.key = null;
+  tvPower(true);
+  tvTick();
+  clearInterval(tv.timer);
+  tv.timer = setInterval(tvTick, 250);
+  tvLoadQueue();
+}
+
+function closeTV() {
+  if (!tv.open) return;
+  tvPower(false);
+  setTimeout(() => {
+    if (tv.pip) tv.pip.close(); // its pagehide puts the TV back and stops it
+    else { T.layer.classList.remove("show"); T.layer.setAttribute("aria-hidden", "true"); tvStopped(); }
+  }, reduceMotion.matches ? 0 : 430);
+}
+
+function tvStopped() {
+  tv.open = false;
+  clearInterval(tv.timer);
+}
+
+function tvPower(on) {
+  const screen = T.screen;
+  const led = T.led;
+  led.classList.toggle("standby", !on);
+  screen.classList.remove("power-on", "power-off");
+  void screen.offsetWidth;
+  if (!reduceMotion.matches) {
+    screen.classList.add(on ? "power-on" : "power-off");
+    if (on) setTimeout(() => { screen.classList.remove("power-on"); tvPlaceArt(); }, 760);
+  }
+  if (on) tvOsd("CH " + tv.ch + " " + TV_CHANNELS[tv.ch]);
+}
+
+function tvOsd(text) {
+  const osd = T.osd;
+  osd.textContent = text;
+  osd.classList.add("show");
+  clearTimeout(tv.osdTimer);
+  tv.osdTimer = setTimeout(() => osd.classList.remove("show"), 1600);
+}
+
+// a burst of snow, drawn on a tiny canvas and blown up pixelated
+function tvStatic(ms = 320) {
+  if (reduceMotion.matches) return;
+  const c = T.snow;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(c.width, c.height);
+  const win = c.ownerDocument.defaultView;
+  const end = performance.now() + ms;
+  c.classList.add("burst");
+  T.screen.classList.add("snowing");
+  const frame = (t) => {
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    if (t < end) win.requestAnimationFrame(frame);
+    else { c.classList.remove("burst"); T.screen.classList.remove("snowing"); }
+  };
+  win.requestAnimationFrame(frame);
+}
+
+function tvSetChannel(ch) {
+  if (tv.ch === ch) return;
+  tv.ch = ch;
+  const box = T.box;
+  box.dataset.ch = String(ch);
+  box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.ch) === ch)));
+  tvStatic(260);
+  tvOsd("CH " + ch + " " + TV_CHANNELS[ch]);
+  if (ch === 3 && Date.now() - tv.queueAt > 5000) tvLoadQueue();
+  tvTick(true);
+}
+
+function tvTick(force) {
+  if (!tv.open) return;
+  const t = state.track;
+  if (state.trackKey !== tv.key) {
+    const first = tv.key === null;
+    tv.key = state.trackKey;
+    if (!first) { tvStatic(); setTimeout(tvLoadQueue, 900); }
+    tvRenderNow(true);
+    if (tv.ch === 3) tvRenderQueue();
+  }
+  if (tv.ch === 1) tvRenderNow(force);
+  if (tv.ch === 2) tvRenderNew(force);
+  if (tv.ch === 3 && Date.now() - tv.queueAt > 20000) tvLoadQueue();
+  if (!t && tv.ch === 1) { T.art.classList.remove("has"); tvNoSignal(T.now, "NO SIGNAL"); }
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function tvNoSignal(box, label) {
+  if (box.dataset.view === "nosignal:" + label) return;
+  box.dataset.view = "nosignal:" + label;
+  const card = el("div", "testcard");
+  const bars = el("div", "bars");
+  for (let i = 0; i < 7; i++) bars.append(el("i"));
+  card.append(bars, el("span"), el("b", "", label));
+  box.replaceChildren(card);
+}
+
+function hms(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return Math.floor(s / 3600) + ":" + String(Math.floor(s / 60) % 60).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+// CH1: the cover, the names, and a VHS counter
+function tvRenderNow(force) {
+  const box = T.now;
+  const t = state.track;
+  if (!t) return;
+  if (force || box.dataset.view !== "now:" + tv.key) {
+    box.dataset.view = "now:" + tv.key;
+    const top = el("div", "vhs-top");
+    top.append(el("span", "vhs-state"), el("span", "", "SP"));
+    const main = el("div", "now-main");
+    const art = el("div", "now-slot");
+    const text = el("div", "now-text");
+    text.append(el("div", "now-song", t.song), el("div", "now-artist", t.artists.join(", ")), el("div", "now-album", t.album || ""));
+    main.append(art, text);
+    const bottom = el("div", "vhs-bottom");
+    bottom.append(el("span", "vhs-time"), el("span", "vhs-bar"));
+    if (t.url) {
+      // content from Spotify, credited and linked back to it
+      const credit = el("a", "", "SPOTIFY ↗");
+      credit.href = t.url; credit.target = "_blank"; credit.rel = "noopener noreferrer";
+      credit.title = "Listen on Spotify";
+      bottom.append(credit);
+    }
+    box.replaceChildren(top, main, bottom);
+    if (t.artUrl) { T.art.src = t.artUrl; T.art.classList.add("has"); } else T.art.classList.remove("has");
+    tvPlaceArt();
+  }
+  const playing = els.stage.classList.contains("playing");
+  const stateEl = box.querySelector(".vhs-state");
+  stateEl.textContent = playing ? "▶ PLAY" : "❚❚ PAUSE";
+  stateEl.classList.toggle("pause", !playing);
+  const at = Math.min(currentElapsed(), state.trackDuration || 0);
+  box.querySelector(".vhs-time").textContent = hms(at);
+  box.querySelector(".vhs-bar").style.setProperty("--p", (state.trackDuration ? Math.min(100, (at / state.trackDuration) * 100) : 0).toFixed(1) + "%");
+}
+
+// the cover lives outside the effects layer, over the empty slot CH1 leaves for it
+function tvPlaceArt() {
+  const slot = T.now.querySelector(".now-slot");
+  if (!slot) return;
+  // in % of the screen, so it stays put when the pop-out window is resized
+  T.art.style.left = (slot.offsetLeft / T.screen.clientWidth * 100).toFixed(2) + "%";
+  T.art.style.top = (slot.offsetTop / T.screen.clientHeight * 100).toFixed(2) + "%";
+}
+
+// CH2: the release radar as a teletext page — tap one to play it
+function tvRenderNew(force) {
+  const box = T.fresh;
+  const head = () => {
+    const h = el("div", "tt-head");
+    h.append(el("b", "", "P100"), el("span", "", "GROOVTEXT"), el("span", "", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })));
+    return h;
+  };
+  if (!radarScopeOk()) {
+    if (box.dataset.view === "login") return;
+    box.dataset.view = "login";
+    box.replaceChildren(head(), el("div", "tt-title", "NEW RELEASES"), el("div", "tt-empty", "The radar needs one more Spotify login: open 📡 Radar on the card first."));
+    return;
+  }
+  if (!radar.at && !radar.loading && !tv.radarAsked) { tv.radarAsked = true; loadRadar(false); }
+  const sig = "new:" + radar.loading + ":" + radar.at + ":" + radar.releases.length + ":" + radar.done;
+  if (!force && box.dataset.view === sig) return;
+  box.dataset.view = sig;
+  const list = el("div", "tt-list");
+  const items = radar.releases.slice(0, 7);
+  if (!items.length) list.append(el("div", "tt-empty", radar.loading ? "SEARCHING… " + radar.done + "/" + (radar.total || "?") : radar.error || "NOTHING NEW IN 3 MONTHS"));
+  items.forEach((r) => {
+    const row = el("button", "tt-row");
+    row.type = "button";
+    const name = el("span");
+    name.append(el("small", "", r.date.slice(5).split("-").reverse().join("/") + " "), r.name + " ", el("em", "", r.artists));
+    row.append(el("i", "", r.type === "Album" ? "A" : r.type === "EP" ? "E" : "S"), name);
+    row.title = "Play " + r.name;
+    row.onclick = async () => {
+      tvStatic(400);
+      let res = null;
+      try { res = await playerCall("play", { context_uri: r.uri }); } catch {}
+      tvOsd(!res ? "NO SIGNAL" : res.ok ? "▶ " + r.type.toUpperCase() : res.status === 403 ? "PREMIUM ONLY" : res.status === 404 ? "NO PLAYER" : "ERR " + res.status);
+      setTimeout(pollSpotify, 600);
+    };
+    list.append(row);
+  });
+  const fast = el("div", "fastext");
+  [["PREV", "prev"], ["PLAY", "play"], ["NEXT", "next"], ["REFRESH", "refresh"]].forEach(([label, act]) => {
+    const b = el("button", "", label);
+    b.type = "button";
+    b.onclick = () => (act === "refresh" ? loadRadar(true) : tvAction(act));
+    fast.append(b);
+  });
+  box.replaceChildren(head(), el("div", "tt-title", "NEW RELEASES"), list, fast);
+}
+
+// CH3: the queue as a teletext page — tap a row to jump there
+async function tvLoadQueue() {
+  if (!tv.open || tv.queueBusy) return;
+  tv.queueBusy = true;
+  try {
+    const q = await spotifyJson("https://api.spotify.com/v1/me/player/queue");
+    tv.queue = (q.queue || []).filter((x) => x && x.uri).slice(0, 8);
+  } catch (e) {
+    tv.queue = null;
+  }
+  tv.queueAt = Date.now();
+  tv.queueBusy = false;
+  tvRenderQueue();
+}
+
+function tvRenderQueue() {
+  const box = T.queue;
+  const head = el("div", "tt-head");
+  const now = new Date();
+  head.append(el("b", "", "P333"), el("span", "", "GROOVTEXT"), el("span", "", now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })));
+  const title = el("div", "tt-title", "UP NEXT");
+  const list = el("div", "tt-list");
+  if (!tv.queue) list.append(el("div", "tt-empty", "PAGE NOT FOUND — couldn't read the queue"));
+  else if (!tv.queue.length) list.append(el("div", "tt-empty", "NOTHING QUEUED"));
+  else tv.queue.forEach((item, i) => {
+    const row = el("button", "tt-row");
+    row.type = "button";
+    const name = el("span");
+    const by = (item.artists || []).map((a) => a.name).join(", ") || (item.show && item.show.name) || "";
+    name.append(item.name + " ", el("em", "", by));
+    row.append(el("i", "", String(i + 1)), name);
+    row.title = "Play " + item.name + " now";
+    row.onclick = () => tvJump(i, item);
+    list.append(row);
+  });
+  const fast = el("div", "fastext");
+  [["PREV", "prev"], ["PLAY", "play"], ["NEXT", "next"], ["REFRESH", "refresh"]].forEach(([label, act]) => {
+    const b = el("button", "", label);
+    b.type = "button";
+    b.onclick = () => (act === "refresh" ? tvLoadQueue() : tvAction(act));
+    fast.append(b);
+  });
+  box.dataset.view = "queue";
+  box.replaceChildren(head, title, list, fast);
+}
+
+async function tvJump(i, item) {
+  tvStatic(500);
+  tvOsd("▶▶ " + (i + 1));
+  const ctx = state.context;
+  let res = null;
+  // jump straight there when the song is part of what's playing; otherwise skip ahead one by one
+  if (ctx && !/:artist:/.test(ctx)) { try { res = await playerCall("play", { context_uri: ctx, offset: { uri: item.uri } }); } catch {} }
+  if (!res || !res.ok) {
+    for (let k = 0; k <= i; k++) {
+      try { res = await api("https://api.spotify.com/v1/me/player/next", { method: "POST" }); } catch { res = null; }
+      if (!res || !res.ok) break;
+      await wait(350);
+    }
+  }
+  if (res && !res.ok) tvOsd(res.status === 403 ? "PREMIUM ONLY" : "ERR " + res.status);
+  setTimeout(pollSpotify, 600);
+  setTimeout(tvLoadQueue, 1200);
+}
+
+async function tvAction(act) {
+  if (act === "play") { toggleVinyl(); tvOsd(els.stage.classList.contains("playing") ? "▶" : "❚❚"); return; }
+  if (act === "fx") {
+    tv.fx = !tv.fx;
+    try { localStorage.setItem("gtt_tv_fx", tv.fx ? "1" : "0"); } catch {}
+    T.box.classList.toggle("strong", tv.fx);
+    T.box.querySelector('[data-tv="fx"]').setAttribute("aria-pressed", String(tv.fx));
+    tvOsd(tv.fx ? "FX STRONG" : "FX SOFT");
+    return;
+  }
+  if (act === "power") { closeTV(); return; }
+  const path = act === "prev" ? "previous" : "next";
+  tvOsd(act === "prev" ? "⏮" : "⏭");
+  let res = null;
+  try { res = await api("https://api.spotify.com/v1/me/player/" + path, { method: "POST" }); } catch {}
+  if (!res || !res.ok) { tvOsd(!res ? "NO SIGNAL" : res.status === 403 ? "PREMIUM ONLY" : res.status === 404 ? "NO PLAYER" : "ERR " + res.status); return; }
+  setTimeout(pollSpotify, 500);
+}
+
+function tvKeys(e) {
+  if (!tv.open || e.target.closest && e.target.closest("input")) return;
+  if (e.key === "1" || e.key === "2" || e.key === "3") tvSetChannel(Number(e.key));
+  else if (e.key === " ") { e.preventDefault(); tvAction("play"); }
+  else if (e.key === "ArrowRight") tvAction("next");
+  else if (e.key === "ArrowLeft") tvAction("prev");
+  else if (e.key === "Escape") closeTV();
+}
+
+T.box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => { b.onclick = () => tvSetChannel(Number(b.dataset.ch)); });
+T.box.querySelectorAll("[data-tv]").forEach((b) => { b.onclick = () => tvAction(b.dataset.tv); });
+T.layer.addEventListener("click", (e) => { if (e.target.id === "tvLayer") closeTV(); });
+document.addEventListener("keydown", tvKeys);
+$("tvBtn").onclick = openTV;
+
 
 const params = new URL(location.href).searchParams;
 const joinCode = params.get("join");
