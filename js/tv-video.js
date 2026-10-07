@@ -73,13 +73,17 @@ function drawTvFrame() {
   // the screen
   const S = { x: 58, y: 52, w: 524, h: 393 };
   ctx.save();
-  rrect(ctx, S.x, S.y, S.w, S.h, 44); ctx.clip();
+  const era = tv.era;
+  rrect(ctx, S.x, S.y, S.w, S.h, era === 70 ? 66 : era === 90 ? 14 : 44); ctx.clip(); // a rounder or flatter tube
   const cols = state.colors && state.colors.key === state.trackKey ? state.colors.colors : null;
   const bg = ctx.createRadialGradient(S.x + S.w / 2, S.y + S.h * 0.45, 10, S.x + S.w / 2, S.y + S.h / 2, S.w * 0.7);
   bg.addColorStop(0, cols ? cols[0] + "55" : "#1a3027"); bg.addColorStop(0.7, "#0d1a14"); bg.addColorStop(1, "#070e0b");
   ctx.fillStyle = bg; ctx.fillRect(S.x, S.y, S.w, S.h);
   if (tv.fx) ctx.globalAlpha = 0.93 + Math.random() * 0.07;
-  if (!t) {
+  if (!t && era === 90) {
+    ctx.fillStyle = "#0a22d8"; ctx.fillRect(S.x, S.y, S.w, S.h);
+    vpipText(ctx, "NO SIGNAL", S.x + S.w / 2 - 80, S.y + S.h / 2 + 12, 36, "#fff", 200);
+  } else if (!t) {
     const bars = ["#c0c0c0", "#c0c000", "#00c0c0", "#00c000", "#c000c0", "#c00000", "#0000c0"];
     bars.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(S.x + (S.w / 7) * i, S.y, S.w / 7 + 1, S.h * 0.8); });
     ctx.fillStyle = "#000"; ctx.fillRect(S.x + S.w / 2 - 110, S.y + S.h * 0.36, 220, 46);
@@ -133,8 +137,16 @@ function drawTvFrame() {
     }
   }
   ctx.globalAlpha = 1;
-  // snow between songs
-  if (vpip.snow > 0 && !reduceMotion.matches) {
+  // the decade's colour: faded and warm with lifted blacks in the 70s; 90s damper wires
+  if (era === 70) {
+    ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = "rgba(255, 214, 165, 0.75)"; ctx.fillRect(S.x, S.y, S.w, S.h);
+    ctx.globalCompositeOperation = "screen"; ctx.fillStyle = "rgba(48, 32, 18, 0.6)"; ctx.fillRect(S.x, S.y, S.w, S.h);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  if (era === 90) { ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; ctx.fillRect(S.x, S.y + S.h / 3, S.w, 1); ctx.fillRect(S.x, S.y + S.h * 2 / 3, S.w, 1); }
+  // between songs: snow, or a cut to black on a 90s set
+  if (vpip.snow > 0 && era === 90) { vpip.snow--; ctx.fillStyle = "#000"; ctx.fillRect(S.x, S.y, S.w, S.h); }
+  else if (vpip.snow > 0 && !reduceMotion.matches) {
     vpip.snow--;
     const n = ctx.createImageData(131, 98);
     for (let i = 0; i < n.data.length; i += 4) { const v = Math.random() * 255; n.data[i] = n.data[i + 1] = n.data[i + 2] = v; n.data[i + 3] = 230; }
@@ -142,10 +154,11 @@ function drawTvFrame() {
     ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, S.x, S.y, S.w, S.h); ctx.imageSmoothingEnabled = true;
   }
   // scanlines, vignette, glare
-  ctx.fillStyle = tv.fx ? "rgba(0, 0, 0, 0.42)" : "rgba(0, 0, 0, 0.3)";
-  for (let y = S.y; y < S.y + S.h; y += 4) ctx.fillRect(S.x, y + 2, S.w, 2);
-  const vig = ctx.createRadialGradient(S.x + S.w / 2, S.y + S.h / 2, S.h * 0.35, S.x + S.w / 2, S.y + S.h / 2, S.w * 0.62);
-  vig.addColorStop(0, "rgba(0,0,0,0)"); vig.addColorStop(1, "rgba(0,0,0,0.6)");
+  const L = era === 70 ? { pitch: 5, dark: 2.5, a: 0.3, vin: 0.3, vout: 0.68 } : era === 90 ? { pitch: 3, dark: 1, a: 0.22, vin: 0.45, vout: 0.32 } : { pitch: 4, dark: 2, a: 0.3, vin: 0.35, vout: 0.6 };
+  ctx.fillStyle = "rgba(0, 0, 0, " + (tv.fx ? L.a + 0.12 : L.a) + ")";
+  for (let y = S.y; y < S.y + S.h; y += L.pitch) ctx.fillRect(S.x, y + L.pitch - L.dark, S.w, L.dark);
+  const vig = ctx.createRadialGradient(S.x + S.w / 2, S.y + S.h / 2, S.h * L.vin, S.x + S.w / 2, S.y + S.h / 2, S.w * 0.62);
+  vig.addColorStop(0, "rgba(0,0,0,0)"); vig.addColorStop(1, "rgba(0,0,0," + L.vout + ")");
   ctx.fillStyle = vig; ctx.fillRect(S.x, S.y, S.w, S.h);
   const gl = ctx.createLinearGradient(S.x, S.y, S.x + S.w * 0.45, S.y + S.h * 0.55);
   gl.addColorStop(0, "rgba(255,255,255,0.12)"); gl.addColorStop(0.6, "rgba(255,255,255,0.03)"); gl.addColorStop(1, "rgba(255,255,255,0)");
