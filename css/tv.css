@@ -1,0 +1,241 @@
+/* ---------- Just listen: an 80s/90s plastic TV (sized in cqw so it scales with its pop-out window) ---------- */
+#tvLayer {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem;
+  background: rgba(8, 4, 6, 0.74); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0; visibility: hidden; transition: opacity 300ms var(--ease), visibility 0s linear 300ms;
+}
+#tvLayer.show { opacity: 1; visibility: visible; transition: opacity 300ms var(--ease), visibility 0s; }
+body.tv-pip { display: grid; place-items: center; min-height: 100vh; padding: 0.5rem; background: #0c090b; }
+.tv { width: min(32rem, 94vw); container-type: inline-size; font-family: "VT323", ui-monospace, Menlo, monospace; -webkit-user-select: none; user-select: none; }
+body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
+.tv-body {
+  position: relative; padding: 4cqw 4cqw 3cqw; border-radius: 5cqw 5cqw 4cqw 4cqw;
+  background: linear-gradient(180deg, #55525c 0%, #34323a 6%, #29272e 55%, #1e1d22 100%);
+  box-shadow: inset 0 0.3cqw 0 rgba(255, 255, 255, 0.18), inset 0 -1cqw 2cqw rgba(0, 0, 0, 0.5), 0 3cqw 7cqw rgba(0, 0, 0, 0.65);
+}
+.tv-body::before, .tv-body::after { content: ""; position: absolute; bottom: -1.4cqw; width: 12cqw; height: 1.6cqw; border-radius: 0 0 1cqw 1cqw; background: #141317; }
+.tv-body::before { left: 12cqw; }
+.tv-body::after { right: 12cqw; }
+.tv-bezel {
+  display: grid; justify-items: center; gap: 1.4cqw;
+  padding: 3cqw 3cqw 1.6cqw; border-radius: 4cqw; background: #121114;
+  box-shadow: inset 0 0 0 0.4cqw #0a090b, inset 0 1cqw 2cqw rgba(0, 0, 0, 0.85), 0 0.3cqw 0 rgba(255, 255, 255, 0.07);
+}
+.tv-screen {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden; isolation: isolate; border-radius: 9% / 12%;
+  clip-path: inset(0 round 9% / 12%); /* filtered layers (the cover, the bloom) can escape a plain overflow clip at the corners */
+  background: radial-gradient(ellipse at 50% 45%, #1a3027, #0d1a14 68%, #070e0b); color: #d6ffe6; font-size: 5cqw; line-height: 1.05;
+  box-shadow: inset 0 0 6cqw rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 0.7cqw currentColor, 0.22cqw 0 0 rgba(255, 30, 80, 0.35), -0.22cqw 0 0 rgba(0, 170, 255, 0.35);
+}
+/* the CRT, layer by layer: bloom lets bright parts bleed over the gaps, soft beam lines sized to the screen
+   (~200 of them, never finer than 3px so they don't shimmer), an RGB aperture grille, and a slow rolling band */
+.tv-screen { --line: 3px; --gap: 1px; --grille: max(3px, 0.36cqw); } /* --line/--gap are set in whole device pixels by tvScanlines() */
+.crt-bloom, .crt-lines, .crt-grille, .crt-roll { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.crt-bloom {
+  z-index: 5; mix-blend-mode: screen; opacity: 0.4;
+  -webkit-backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2); backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2);
+}
+/* the beam lines are drawn on a canvas, one row per physical pixel, lined up with the screen's pixel grid
+   (a CSS gradient pattern smears into grey at 125% display scaling) */
+.crt-lines { z-index: 6; mix-blend-mode: multiply; width: 100%; opacity: 0.6; image-rendering: pixelated; }
+.crt-grille {
+  z-index: 6; mix-blend-mode: multiply; opacity: 0.16;
+  background: linear-gradient(90deg, #ff4040 0 33.3%, #40ff60 33.3% 66.6%, #4060ff 66.6%) 0 0 / var(--grille) 100% repeat;
+}
+.crt-roll {
+  z-index: 7; mix-blend-mode: screen; opacity: 0.35;
+  background: linear-gradient(180deg, transparent 0%, rgba(200, 255, 220, 0.05) 40%, rgba(200, 255, 220, 0.09) 50%, rgba(200, 255, 220, 0.05) 60%, transparent 100%) 0 0 / 100% 35% no-repeat;
+  animation: crt-roll 9s linear infinite;
+}
+@keyframes crt-roll { from { background-position: 0 -40%; } to { background-position: 0 160%; } }
+.tv.strong .crt-lines { opacity: 0.78; animation: crt-interlace 0.067s steps(1) infinite; }
+.tv.strong .crt-grille { opacity: 0.26; }
+.tv.strong .crt-roll { opacity: 1; animation-duration: 5s; }
+.tv.strong .crt-bloom { opacity: 0.5; }
+@keyframes crt-interlace { 50% { translate: 0 var(--gap); } }
+.tv-screen::after {
+  content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 22%, transparent 34%);
+}
+.tv.strong .tv-content { animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite; }
+.tv.strong .tv-screen { text-shadow: 0 0 1cqw currentColor, 0.45cqw 0 0 rgba(255, 30, 80, 0.45), -0.45cqw 0 0 rgba(0, 170, 255, 0.45); }
+@keyframes tv-flicker { 50% { opacity: 0.94; } }
+@keyframes tv-jitter { 0%, 92%, 100% { transform: none; } 94% { transform: translateX(0.4cqw) skewX(-1deg); } 96% { transform: translateX(-0.3cqw); } }
+.tv-content { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.tv-screen.power-on .tv-content { animation: tv-on 750ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tv-screen.power-off .tv-content { animation: tv-off 420ms cubic-bezier(0.6, 0, 0.8, 0.4) both; }
+@keyframes tv-on {
+  0% { transform: scale(0.02, 0.004); filter: brightness(6); }
+  35% { transform: scale(1, 0.006); filter: brightness(5); }
+  100% { transform: none; filter: none; }
+}
+@keyframes tv-off {
+  0% { transform: none; filter: none; }
+  55% { transform: scale(1, 0.006); filter: brightness(5); }
+  100% { transform: scale(0, 0.004); filter: brightness(8); opacity: 0; }
+}
+.tv-static { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; opacity: 0; pointer-events: none; image-rendering: pixelated; transition: opacity 260ms var(--ease); }
+.tv-static.burst { opacity: 0.9; transition: none; }
+.tv-osd {
+  position: absolute; z-index: 4; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
+  color: #4dff86; font-size: 6.5cqw; letter-spacing: 0.06em;
+  opacity: 0;
+}
+.tv-osd.show { animation: tv-osd 2.1s linear forwards; }
+@keyframes tv-osd { 0%, 76% { opacity: 1; } 100% { opacity: 0; } }
+.tv-ch { position: absolute; inset: 0; display: none; padding: 7cqw 9cqw; }
+.tv[data-ch="1"] #tvNow, .tv[data-ch="2"] #tvNew, .tv[data-ch="3"] #tvQueue, .tv[data-ch="4"] #tvCover { display: flex; }
+/* CH1: now playing, VHS style */
+#tvNow { flex-direction: column; justify-content: space-between; }
+.vhs-top { display: flex; justify-content: space-between; font-size: 5.5cqw; color: #fff; }
+.vhs-top .pause { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.now-main { display: grid; grid-template-columns: 30cqw 1fr; gap: 4cqw; align-items: center; min-height: 0; }
+.now-slot { width: 30cqw; aspect-ratio: 1; }
+/* the cover gets the TV treatment too: under the scanlines, vignette and glare, with a little phosphor glow.
+   A deliberate choice — Spotify's design guidelines ask for artwork without filters or overlays. */
+#tvArt {
+  position: absolute; z-index: 4; width: 30cqw; aspect-ratio: 1; border-radius: 1.2cqw; object-fit: cover;
+  display: none; opacity: 1; transition: opacity 400ms var(--ease);
+  filter: saturate(1.25) contrast(1.08) brightness(1.04);
+  box-shadow: 0 0 2.4cqw rgba(140, 255, 200, 0.16);
+}
+.tv.strong #tvArt {
+  filter: saturate(1.35) contrast(1.12) drop-shadow(0.35cqw 0 0 rgba(255, 30, 80, 0.4)) drop-shadow(-0.35cqw 0 0 rgba(0, 170, 255, 0.4));
+  animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite;
+}
+.tv[data-ch="1"] #tvArt.has, .tv[data-ch="4"] #tvArt.has { display: block; }
+/* CH4: the cover, big, on its own colours (Spotify allows backgrounds taken from the artwork's colours) */
+#tvCover {
+  flex-direction: column; align-items: center; justify-content: center; gap: 2.5cqw; padding: 4cqw 6cqw;
+  background: radial-gradient(ellipse at 50% 42%, var(--c1, #1a2a22) 0%, var(--c2, #0b1410) 62%, #030605 100%);
+  transition: background 600ms var(--ease);
+}
+/* CH4: the cover fills the whole screen (cropped top and bottom to the 4:3 tube), under the CRT layers */
+.tv[data-ch="4"] #tvArt.has { left: 0 !important; top: 0 !important; width: 100% !important; height: 100%; aspect-ratio: auto; border-radius: 0; }
+/* CH4's caption: name, artist and where in the song we are, like a music channel's lower third. It sits next to
+   the cover (not inside the channel layer, which FX animates) so it always stays on top of it */
+#tvCap {
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; display: none; padding: 14cqw 9cqw 6.5cqw;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.86) 0%, rgba(0, 0, 0, 0.66) 55%, transparent 100%);
+  color: #fff; text-shadow: 0 0 0.6cqw currentColor, 0 0.3cqw 0.6cqw #000; pointer-events: none;
+  transition: opacity 400ms var(--ease);
+}
+.tv[data-ch="4"] #tvCap.has { display: grid; gap: 0.6cqw; }
+.tv-screen.power-on #tvCap, .tv-screen.power-off #tvCap, .tv-screen.snowing #tvCap { opacity: 0; transition: none; }
+#tvCap.in { animation: cap-in 700ms var(--ease-out) both; }
+@keyframes cap-in { from { opacity: 0; transform: translateX(-4cqw); } }
+.cap-song { font-size: 7.4cqw; line-height: 1; color: #ffe95c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap-artist { font-size: 5cqw; line-height: 1; color: #7ff6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap-prog { display: flex; align-items: center; gap: 2cqw; margin-top: 1.4cqw; font-size: 4.2cqw; line-height: 1; }
+.cap-bar { position: relative; flex: 1; height: 0.8cqw; border-radius: 0.4cqw; background: rgba(255, 255, 255, 0.24); }
+.cap-bar::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); border-radius: inherit;
+  background: #fff; box-shadow: 0 0 1.2cqw rgba(255, 255, 255, 0.7);
+}
+.cap-bar::after {
+  content: ""; position: absolute; top: 50%; left: var(--p, 0%); width: 2.2cqw; height: 2.2cqw; border-radius: 50%;
+  translate: -50% -50%; background: #fff; box-shadow: 0 0 1.4cqw #fff;
+}
+#tvCap.paused .cap-at { animation: blink 1s steps(2) infinite; }
+#tvCap.paused .cap-bar::before, #tvCap.paused .cap-bar::after { background: #bdb6c4; box-shadow: none; }
+/* "clean" (tap the screen or press I): just the cover and the line */
+#tvCap.clean { padding-top: 4cqw; background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), transparent); }
+#tvCap.clean .cap-song, #tvCap.clean .cap-artist { display: none; }
+.tv.strong #tvCap { animation: tv-flicker 0.14s steps(2) infinite; }
+.tv[data-ch="4"] .tv-screen { cursor: pointer; }
+.tv-screen.power-on #tvArt, .tv-screen.power-off #tvArt, .tv-screen.snowing #tvArt { opacity: 0; transition: none; }
+.vhs-bottom a { color: #1ed760; text-decoration: none; font-size: 4.6cqw; }
+.now-text { display: grid; gap: 1.2cqw; min-width: 0; }
+.now-song { font-size: 7cqw; color: #ffe95c; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.now-artist { font-size: 5.5cqw; color: #7ff6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-album { font-size: 4.5cqw; color: #9fb7aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vhs-bottom { display: flex; align-items: center; gap: 2.5cqw; font-size: 5.5cqw; color: #fff; }
+.vhs-bar {
+  position: relative; flex: 1; height: 3.2cqw; min-width: 0;
+  background: repeating-linear-gradient(90deg, rgba(77, 255, 134, 0.22) 0 1.8cqw, transparent 1.8cqw 2.6cqw);
+}
+.vhs-bar::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p, 0%);
+  background: repeating-linear-gradient(90deg, #4dff86 0 1.8cqw, transparent 1.8cqw 2.6cqw);
+  filter: drop-shadow(0 0 0.6cqw rgba(77, 255, 134, 0.7));
+}
+/* the test card behind NO SIGNAL */
+.testcard { position: absolute; inset: 0; display: grid; grid-template-rows: 1fr auto; }
+.bars { display: grid; grid-template-columns: repeat(7, 1fr); }
+.bars i { display: block; }
+.bars i:nth-child(1) { background: #c0c0c0; } .bars i:nth-child(2) { background: #c0c000; } .bars i:nth-child(3) { background: #00c0c0; }
+.bars i:nth-child(4) { background: #00c000; } .bars i:nth-child(5) { background: #c000c0; } .bars i:nth-child(6) { background: #c00000; } .bars i:nth-child(7) { background: #0000c0; }
+.testcard b {
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); padding: 1.5cqw 4cqw; background: #000; color: #fff;
+  font-size: 6.5cqw; font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; text-shadow: none;
+}
+.testcard span { height: 18%; background: linear-gradient(90deg, #000 0 25%, #fff 25% 50%, #222 50% 75%, #111 75%); }
+/* CH2 (Groovtext) and CH3 (the queue): teletext pages */
+#tvQueue, #tvNew { flex-direction: column; gap: 1cqw; padding: 6.5cqw 8cqw; background: #000; font-size: 4.6cqw; text-shadow: 0 0 0.5cqw currentColor; }
+.tt-head { display: flex; justify-content: space-between; color: #fff; }
+.tt-head b { font-weight: 400; color: #ffff3d; }
+.tt-title { padding: 0.4cqw 2cqw; background: #0015d6; color: #ffff3d; font-size: 7cqw; letter-spacing: 0.08em; }
+.tt-list { display: grid; gap: 0.2cqw; flex: 1; min-height: 0; overflow: hidden; }
+.tt-row {
+  display: grid; grid-template-columns: 4.5cqw 1fr; gap: 1.5cqw; min-height: 0; padding: 0.2cqw 0.6cqw; text-align: left;
+  font: inherit; color: #fff; background: transparent; border-radius: 0; cursor: pointer; text-shadow: inherit;
+}
+.tt-row:hover, .tt-row:focus-visible { background: #0015d6; outline: none; }
+.tt-row i { font-style: normal; color: #3dffff; }
+.tt-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-row em { font-style: normal; color: #3dff3d; }
+.tt-row small { font-size: inherit; color: #ff3dff; }
+.tt-empty { color: #ff3dff; }
+.tt-flip { min-height: 0; border-radius: 0; font-family: inherit; font-weight: 400; text-align: left; text-shadow: inherit; cursor: pointer; }
+.tt-flip:hover, .tt-flip:focus-visible { background: #2a3dff; outline: none; }
+.fastext { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1cqw; }
+.fastext button {
+  min-height: 0; padding: 0.4cqw 0; border-radius: 0; font: inherit; font-size: 4.2cqw; color: #000; text-shadow: none; cursor: pointer;
+}
+.fastext button:nth-child(1) { background: #ff2a2a; } .fastext button:nth-child(2) { background: #2aff2a; }
+.fastext button:nth-child(3) { background: #ffff2a; } .fastext button:nth-child(4) { background: #2affff; }
+/* the control strip under the screen */
+.tv-panel { display: flex; align-items: center; gap: 2.2cqw; margin-top: 3cqw; padding: 0 1cqw; }
+.tv-screen { width: 100%; }
+.tv-brand {
+  font: 800 2.4cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; letter-spacing: 0.42em; padding-left: 0.42em;
+  background: linear-gradient(180deg, #f2eff5, #8a8590); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tv-grille { flex: 1; height: 4.6cqw; border-radius: 1cqw; background: repeating-linear-gradient(90deg, #121114 0 0.7cqw, transparent 0.7cqw 1.6cqw); opacity: 0.85; }
+.tv-btns { display: flex; gap: 1.1cqw; }
+.tv-btn {
+  width: 6.6cqw; height: 5cqw; min-height: 0; padding: 0; border-radius: 0.9cqw;
+  font: 700 2.9cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #d8d3dc;
+  background: linear-gradient(180deg, #4d4a54, #2a292f); box-shadow: 0 0.45cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.16);
+  transition: transform 80ms var(--ease), box-shadow 80ms var(--ease), color 150ms var(--ease);
+}
+.tv-btn:active { transform: translateY(0.35cqw); box-shadow: 0 0.1cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.1); }
+@media (hover: hover) and (pointer: fine) { .tv-btn:hover { background: linear-gradient(180deg, #57545e, #303036); } }
+.tv-btn[aria-pressed="true"] { color: #ffc23d; }
+.tv-power {
+  position: relative; width: 6cqw; height: 6cqw; min-height: 0; padding: 0; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #5a5762, #232227); box-shadow: 0 0.45cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.16);
+  color: #d8d3dc; font-size: 3cqw;
+}
+.tv-led { width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: #3dff7a; box-shadow: 0 0 1.2cqw #3dff7a; }
+.tv-led.standby { background: #ff3b30; box-shadow: 0 0 1.2cqw #ff3b30; }
+#app.guest #tvBtn, #app.lobby #tvBtn { display: none; }
+/* the video the TV is streamed into for picture-in-picture: kept in view (iOS pauses videos it can't see), but invisible */
+.tv-video { position: absolute; right: 0.5rem; bottom: 0.5rem; width: 7.5rem; height: 6.5rem; opacity: 0.01; pointer-events: none; }
+.tv-btn[hidden] { display: none; }
+#tvLayer.vpip .tv-btn[data-tv="pip"] { color: #ffc23d; }
+@media (prefers-reduced-motion: reduce) {
+  .lava i, .disc, .led, .led::after, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
+  .confetti { display: none; }
+  .flame.lit, .flame.pop, #stStreak.blaze { animation: none; }
+  .flame.out { animation: none; opacity: 0; }
+  .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
+  #cover.flipped .cover-back img, #ambient i { animation: none; }
+  .tv .tv-content, .tv.strong .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
+  button:active { transform: none; }
+  .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
+}
