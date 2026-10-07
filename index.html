@@ -789,9 +789,10 @@
   .tv-osd {
     position: absolute; z-index: 4; top: 5cqw; right: 7cqw; padding: 0.3cqw 1.6cqw; background: rgba(0, 0, 0, 0.88);
     color: #4dff86; font-size: 6.5cqw; letter-spacing: 0.06em;
-    opacity: 0; transition: opacity 500ms var(--ease);
+    opacity: 0;
   }
-  .tv-osd.show { opacity: 1; transition: none; }
+  .tv-osd.show { animation: tv-osd 2.1s linear forwards; }
+  @keyframes tv-osd { 0%, 76% { opacity: 1; } 100% { opacity: 0; } }
   .tv-ch { position: absolute; inset: 0; display: none; padding: 7cqw 9cqw; }
   .tv[data-ch="1"] #tvNow, .tv[data-ch="2"] #tvNew, .tv[data-ch="3"] #tvQueue, .tv[data-ch="4"] #tvCover { display: flex; }
   /* CH1: now playing, VHS style */
@@ -4193,8 +4194,7 @@ async function openTV() {
   tv.key = null;
   tvPower(true);
   tvTick();
-  clearInterval(tv.timer);
-  tv.timer = setInterval(tvTick, 250);
+  tvStartTicker();
   tvLoadQueue();
 }
 
@@ -4207,9 +4207,16 @@ function closeTV() {
   }, reduceMotion.matches ? 0 : 430);
 }
 
+function tvStartTicker() {
+  if (tv.timer) (tv.timerWin || window).clearInterval(tv.timer);
+  tv.timerWin = tvWin();
+  tv.timer = tv.timerWin.setInterval(tvTick, 250);
+}
+
 function tvStopped() {
   tv.open = false;
-  clearInterval(tv.timer);
+  try { (tv.timerWin || window).clearInterval(tv.timer); } catch {}
+  tv.timer = 0;
   vpipStop();
 }
 
@@ -4248,7 +4255,11 @@ function tvPower(on) {
   void screen.offsetWidth;
   if (!reduceMotion.matches) {
     screen.classList.add(on ? "power-on" : "power-off");
-    if (on) setTimeout(() => { screen.classList.remove("power-on"); tvPlaceArt(); }, 760);
+    if (on) {
+      const done = () => { screen.classList.remove("power-on"); tvPlaceArt(); };
+      screen.querySelector(".tv-content").addEventListener("animationend", done, { once: true });
+      tvWin().setTimeout(done, 900);
+    }
   }
   if (on) tvOsd("CH " + tv.ch + " " + TV_CHANNELS[tv.ch]);
 }
@@ -4256,32 +4267,46 @@ function tvPower(on) {
 function tvOsd(text) {
   const osd = T.osd;
   osd.textContent = text;
+  osd.classList.remove("show");
+  void osd.offsetWidth; // restart the fade
   osd.classList.add("show");
-  clearTimeout(tv.osdTimer);
-  tv.osdTimer = setTimeout(() => osd.classList.remove("show"), 1600);
 }
 
 // a burst of snow, drawn on a tiny canvas and blown up pixelated
+// The deadline is measured on the TV window's own clock: in the pop-out window, rAF timestamps count from when
+// that window opened, so mixing them with the main page's clock kept the snow (and the hidden cover) up for
+// as long as the page had been open before the TV popped out. A safety timer ends it regardless.
 function tvStatic(ms = 320) {
   if (reduceMotion.matches) return;
   const c = T.snow;
+  const win = c.ownerDocument.defaultView;
+  if (!win || c.ownerDocument.hidden) return; // rAF doesn't run in a hidden window, so the snow couldn't stop
   const ctx = c.getContext("2d");
   const img = ctx.createImageData(c.width, c.height);
-  const win = c.ownerDocument.defaultView;
-  const end = performance.now() + ms;
+  const end = win.performance.now() + ms;
+  const id = (tv.snowId = (tv.snowId || 0) + 1);
+  const stop = () => { if (tv.snowId !== id) return; c.classList.remove("burst"); T.screen.classList.remove("snowing"); };
   c.classList.add("burst");
   T.screen.classList.add("snowing");
-  const frame = (t) => {
+  const frame = () => {
+    if (tv.snowId !== id) return; // a newer burst took over
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() * 255;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
       img.data[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
-    if (t < end) win.requestAnimationFrame(frame);
-    else { c.classList.remove("burst"); T.screen.classList.remove("snowing"); }
+    if (win.performance.now() < end) win.requestAnimationFrame(frame);
+    else stop();
   };
   win.requestAnimationFrame(frame);
+  win.setTimeout(stop, ms + 400);
+}
+
+// timers on the TV's own window: a background tab gets its timers throttled (to once a minute after a while),
+// but the pop-out window is on screen
+function tvWin() {
+  return T.box.ownerDocument.defaultView || window;
 }
 
 function tvSetChannel(ch) {
@@ -4303,6 +4328,11 @@ function tvShowChannel() {
 
 function tvTick(force) {
   if (!tv.open) return;
+  // the main page's poll gets throttled when its tab is in the background; the TV fetches for itself then
+  if (state.mode === "spotify" && Date.now() - state.lastPoll > CONFIG.pollMs + 1500 && Date.now() - (tv.pollAt || 0) > CONFIG.pollMs) {
+    tv.pollAt = Date.now();
+    pollSpotify();
+  }
   const t = state.track;
   if (state.trackKey !== tv.key) {
     const first = tv.key === null;
@@ -4402,8 +4432,7 @@ function tvRenderCover(force) {
     box.replaceChildren(cap);
     if (t.artUrl) { T.art.src = t.artUrl; T.art.classList.add("has"); } else T.art.classList.remove("has");
     // a lower third for the new song, then the whole screen is the cover
-    clearTimeout(tv.capTimer);
-    tv.capTimer = setTimeout(() => cap.classList.remove("show"), 4500);
+    tvWin().setTimeout(() => cap.classList.remove("show"), 4500);
   }
   const cols = state.colors && state.colors.key === tv.key ? state.colors.colors : null;
   if (box.dataset.colors !== String(cols)) {
