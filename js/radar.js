@@ -30,15 +30,45 @@ function relDay(iso) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Spotify slows down apps in development mode that ask for too much at once: 429 and a Retry-After. Every request
+// then sits out the same pause (remembered across reloads) instead of each one knocking again, which only makes
+// the penalty longer
+const spotifyGate = { until: 0 };
+try { spotifyGate.until = Number(localStorage.getItem("gtt_spotify_pause")) || 0; } catch {}
+
+function waitText(ms) {
+  const m = Math.ceil(ms / 60000);
+  return m <= 1 ? "a minute" : m < 90 ? m + " min" : Math.round(m / 60) + " h";
+}
+
+function rateLimited(ms) {
+  return Object.assign(new Error("Spotify is pausing this app — try again in " + waitText(ms)), { status: 429, retryIn: ms });
+}
+
 async function spotifyJson(url) {
   for (let i = 0; ; i++) {
+    const left = spotifyGate.until - Date.now();
+    if (left > 5000) throw rateLimited(left);
+    if (left > 0) await wait(left);
     const res = await api(url);
-    if (res.ok) return res.json();
-    if (res.status !== 429 || i >= 3) throw Object.assign(new Error("Spotify said " + res.status), { status: res.status });
-    const after = Number(res.headers.get("Retry-After")) || 2 ** i;
-    if (after > 30) throw Object.assign(new Error("Spotify is rate-limiting us — try again in a bit"), { status: 429 });
-    await wait(after * 1000);
+    if (res.ok) { spotifyGate.step = 0; return res.json(); }
+    if (res.status !== 429) throw Object.assign(new Error("Spotify said " + res.status), { status: res.status });
+    // the browser often isn't allowed to read Retry-After (CORS); without it the pause grows: 30 s, 1, 2, 4… 15 min
+    const said = Number(res.headers.get("Retry-After")) * 1000;
+    const after = said || Math.min(15 * 60000, Math.max(30000, (spotifyGate.step || 0) * 2));
+    if (!said) spotifyGate.step = after;
+    spotifyGate.until = Math.max(spotifyGate.until, Date.now() + after);
+    try { localStorage.setItem("gtt_spotify_pause", String(spotifyGate.until)); } catch {}
+    if (after > 5000 || i >= 2) throw rateLimited(after);
   }
+}
+
+// what went wrong, in a few words, for the radar and the TV pages
+function spotifyProblem(e) {
+  if (!e) return "";
+  if (e.status === 429) return e.message;
+  if (e.status === 401 || e.status === 403) return "Spotify said no (" + e.status + ") — log in again";
+  return e.status ? "Spotify said " + e.status : "couldn't reach Spotify";
 }
 
 // your 50 most played artists over the last ~6 months (Spotify's "medium_term")
@@ -98,11 +128,18 @@ async function loadRadar(force) {
     radar.total = ids.length;
     const cutoff = isoDay(RADAR_MAX_DAYS);
     const found = [];
-    let next = 0;
-    await Promise.all(Array.from({ length: 5 }, async () => {
+    let next = 0, problem = null;
+    // two at a time with a breather between: slower, but it stays under Spotify's limit for apps like this one
+    await Promise.all(Array.from({ length: 2 }, async () => {
       while (next < ids.length) {
         const id = ids[next++];
-        try { found.push(...(await artistReleases(id, cutoff)).map(cleanRelease)); } catch { radar.failed++; }
+        try { found.push(...(await artistReleases(id, cutoff)).map(cleanRelease)); }
+        catch (e) {
+          radar.failed++;
+          problem = e;
+          if (e.status === 429) next = ids.length; // paused: asking for the rest would only extend the pause
+        }
+        await wait(150);
         radar.done++;
         radar.releases = dedupeReleases(found);
         if (!radarRenderTimer) radarRenderTimer = setTimeout(() => { radarRenderTimer = 0; renderRadar(); }, 150);
@@ -110,11 +147,13 @@ async function loadRadar(force) {
     }));
     radar.artists = ids.length;
     radar.at = Date.now();
-    if (ids.length && radar.failed === ids.length) radar.error = "couldn't reach Spotify — hit Refresh";
-    else try { localStorage.setItem("gtt_radar_v2", JSON.stringify({ at: radar.at, artists: radar.artists, releases: radar.releases })); } catch {}
+    if (problem && (problem.status === 429 || radar.failed === ids.length)) {
+      radar.error = spotifyProblem(problem); // shown, but not cached, so the next try asks again
+      if (!radar.releases.length) radar.at = 0;
+    } else try { localStorage.setItem("gtt_radar_v2", JSON.stringify({ at: radar.at, artists: radar.artists, releases: radar.releases })); } catch {}
   } catch (e) {
     console.error("[gtt] radar failed", e);
-    radar.error = e.status === 401 || e.status === 403 ? "Spotify said no — log in again below" : e.message;
+    radar.error = e.status === 401 || e.status === 403 ? "Spotify said no — log in again below" : spotifyProblem(e);
     if (e.status === 401 || e.status === 403) try { localStorage.removeItem("gtt_radar_v2"); } catch {}
   }
   radar.loading = false;
