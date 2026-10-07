@@ -1,0 +1,19 @@
+{
+  "name": "Guess The Track",
+  "short_name": "GuessTrack",
+  "description": "Guess the song playing on your Spotify — or just listen on a retro TV.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#120a0e",
+  "theme_color": "#120a0e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Just listen", "short_name": "TV", "description": "Open the retro TV", "url": "./?tv=1", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
