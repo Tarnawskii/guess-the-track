@@ -10,16 +10,16 @@ else if (params.has("rooms")) {
   setStatus("pick a room to join");
   setLobbyOpen(true);
 } else {
-  if (params.has("tv")) {
-    try { sessionStorage.setItem("gtt_open_tv", "1"); } catch {}
+  if (params.has("tv")) { // ?tv=1 turns the TV on, ?tv=big straight onto the big screen
+    try { sessionStorage.setItem("gtt_open_tv", params.get("tv") === "big" ? "big" : "1"); } catch {}
     history.replaceState(null, "", location.pathname);
   }
   startSpotify().then(() => {
-    let want = false;
-    try { want = sessionStorage.getItem("gtt_open_tv") === "1"; } catch {}
+    let want = null;
+    try { want = sessionStorage.getItem("gtt_open_tv"); } catch {}
     if (!want || state.mode !== "spotify") return;
     try { sessionStorage.removeItem("gtt_open_tv"); } catch {}
-    openTV();
+    openTV({ big: want === "big" });
   });
 }
 renderNet();

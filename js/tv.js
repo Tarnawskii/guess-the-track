@@ -9,7 +9,7 @@ const TV_CHANNELS = { 1: "NOW", 2: "TEXT", 3: "QUEUE", 4: "COVER" };
 try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) tv.ch = c; } catch {} // the TV remembers its channel
 // grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
 const T = {
-  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"), cap: $("tvCap"),
+  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"), cap: $("tvCap"), hint: $("tvHint"),
   snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"), lines: $("tvLines"),
 };
 
@@ -28,8 +28,9 @@ function copyStylesTo(doc) {
   }
 }
 
-async function openTV() {
+async function openTV(opts = {}) {
   setMenuOpen(false);
+  if (tv.open && opts.big && !tv.big) { tvBig(true); return; }
   if (tv.open || state.mode !== "spotify") return;
   if (activeGame() === "heardle") setGame("quiz"); // Heardle would keep pausing the music
   tv.open = true;
@@ -39,7 +40,7 @@ async function openTV() {
   box.querySelector('[data-tv="fx"]').setAttribute("aria-pressed", String(tv.fx));
   // a pop-out window needs a click to open; from the home screen shortcut there isn't one, so that's the full-page TV
   const tapped = !navigator.userActivation || navigator.userActivation.isActive;
-  if ("documentPictureInPicture" in window && tapped) {
+  if ("documentPictureInPicture" in window && tapped && !opts.big) {
     try {
       if (documentPictureInPicture.window) documentPictureInPicture.window.close(); // one pop-out at a time
       const w = await documentPictureInPicture.requestWindow({ width: 440, height: 400 });
@@ -69,6 +70,73 @@ async function openTV() {
   tvTick();
   tvStartTicker();
   tvLoadQueue();
+  if (opts.big) tvBig(true);
+}
+
+// ---------- big screen: just the tube, as large as the window allows ----------
+// For a laptop plugged into the TV, for casting this tab to a Chromecast (Chrome's own "Cast tab"), or AirPlay.
+// The controls fade out until the mouse moves, and the screen is kept awake. A Chromecast runs one app at a time,
+// so this is the picture only: the music keeps playing wherever Spotify plays it.
+async function tvBig(on) {
+  if (on && tv.pip) { // a pop-out window can't go full screen: bring the TV back to the page first
+    tv.pip.close();
+    await wait(150);
+    openTV({ big: true });
+    return;
+  }
+  if (tv.big === on) return;
+  tv.big = on;
+  T.layer.classList.toggle("big", on);
+  T.box.querySelector('[data-tv="big"]').setAttribute("aria-pressed", String(on));
+  if (on) {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+        tv.wentFull = true;
+      }
+    } catch {} // no full screen without a click, or on an iPhone: the page still fills the window
+    tvWake(true);
+    tvIdle();
+    tvCastHint();
+  } else {
+    if (tv.wentFull && document.fullscreenElement) try { await document.exitFullscreen(); } catch {}
+    tv.wentFull = false;
+    tvWake(false);
+    clearTimeout(tv.idleTimer);
+    T.layer.classList.remove("idle");
+    T.hint.hidden = true;
+  }
+  tvScanlines();
+  tvPlaceArt();
+  setTimeout(() => { tvScanlines(); tvPlaceArt(); }, 400); // once full screen has settled
+}
+
+function tvIdle() {
+  T.layer.classList.remove("idle");
+  clearTimeout(tv.idleTimer);
+  if (tv.big) tv.idleTimer = setTimeout(() => T.layer.classList.add("idle"), 3000);
+}
+
+async function tvWake(on) {
+  try {
+    if (on && !tv.wake && navigator.wakeLock) {
+      tv.wake = await navigator.wakeLock.request("screen");
+      tv.wake.addEventListener("release", () => { tv.wake = null; });
+    }
+    if (!on && tv.wake) { await tv.wake.release(); tv.wake = null; }
+  } catch {}
+}
+
+// how to get it onto the TV from here, for ten seconds (or until tapped)
+function tvCastHint() {
+  const how = isIOS ? "iPhone can't send a web page to a Chromecast. On an Apple TV or AirPlay TV: Control Centre → Screen Mirroring."
+    : /Android/.test(navigator.userAgent) ? "Chromecast: Google Home app → your Chromecast → Cast my screen."
+    : window.chrome ? "Chromecast: Chrome's ⋮ menu → Cast… → pick your TV."
+    : "To get it on the TV: cast or mirror this window.";
+  T.hint.replaceChildren(el("b", "", how), el("span", "", "The music keeps playing where Spotify plays it. Casting to the Chromecast that Spotify is playing on stops the music there."));
+  T.hint.hidden = false;
+  clearTimeout(tv.hintTimer);
+  tv.hintTimer = setTimeout(() => { T.hint.hidden = true; }, 10000);
 }
 
 function closeTV() {
@@ -87,6 +155,7 @@ function tvStartTicker() {
 }
 
 function tvStopped() {
+  if (tv.big) tvBig(false);
   tv.open = false;
   try { (tv.timerWin || window).clearInterval(tv.timer); } catch {}
   tv.timer = 0;
@@ -463,6 +532,7 @@ async function tvAction(act) {
   if (act === "power") { closeTV(); return; }
   if (act === "era") { tvSetEra(tv.era === 70 ? 80 : tv.era === 80 ? 90 : 70); return; }
   if (act === "pip") { vpipEnter(); return; }
+  if (act === "big") { tvBig(!tv.big); return; }
   if (act !== "prev" && act !== "next") return; // a button this version doesn't know does nothing, not "next song"
   const path = act === "prev" ? "previous" : "next";
   tvOsd(act === "prev" ? "⏮" : "⏭");
@@ -478,7 +548,8 @@ function tvKeys(e) {
   else if (e.key === " ") { e.preventDefault(); tvAction("play"); }
   else if (e.key === "ArrowRight") tvAction("next");
   else if (e.key === "ArrowLeft") tvAction("prev");
-  else if (e.key === "Escape") closeTV();
+  else if (e.key === "Escape") { if (tv.big) tvBig(false); else closeTV(); }
+  else if (e.key === "f" || e.key === "F") tvAction("big");
   else if (e.key === "e" || e.key === "E") tvAction("era");
   else if ((e.key === "i" || e.key === "I") && tv.ch === 4) tvToggleClean();
 }
@@ -490,4 +561,11 @@ T.layer.addEventListener("click", (e) => { if (e.target.id === "tvLayer") closeT
 T.screen.addEventListener("click", () => { if (tv.ch === 4) tvToggleClean(); });
 document.addEventListener("keydown", tvKeys);
 addEventListener("resize", () => { if (tv.open && !tv.pip) tvScanlines(); });
-$("tvBtn").onclick = openTV;
+$("tvBtn").onclick = () => openTV();
+$("castBtn").onclick = () => openTV({ big: true });
+T.layer.addEventListener("pointermove", tvIdle);
+T.layer.addEventListener("pointerdown", tvIdle);
+T.hint.addEventListener("click", () => { T.hint.hidden = true; });
+// Esc leaves full screen before the page hears it: leave big screen with it
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && tv.big && tv.wentFull) tvBig(false); });
+document.addEventListener("visibilitychange", () => { if (tv.big && document.visibilityState === "visible") tvWake(true); });

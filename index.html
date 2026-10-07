@@ -56,6 +56,7 @@
         <button id="lyrBtn" class="menu-item" type="button" aria-pressed="false"><span class="mi-icon" aria-hidden="true">🎤</span><span class="mi-text"><b>Lyric hints</b><small>from lrclib.net, karaoke after</small></span><span class="switch" aria-hidden="true"></span></button>
         <button id="vsBtn" class="menu-item" type="button" aria-pressed="false"><span class="mi-icon" aria-hidden="true">VS</span><span class="mi-text"><b>Versus</b><small>same device, or online with your Jam</small></span><span class="switch" aria-hidden="true"></span></button>
         <button id="tvBtn" class="menu-item" type="button"><span class="mi-icon" aria-hidden="true">📺</span><span class="mi-text"><b>Just listen</b><small>retro TV · teletext · charts · for you</small></span><span class="mi-go" aria-hidden="true">↗</span></button>
+        <button id="castBtn" class="menu-item" type="button"><span class="mi-icon" aria-hidden="true">📡</span><span class="mi-text"><b>Cast to TV</b><small>big screen · Chromecast · AirPlay</small></span><span class="mi-go" aria-hidden="true">↗</span></button>
         <button id="pipBtn" class="menu-item" type="button"><span class="mi-icon" aria-hidden="true">⧉</span><span class="mi-text"><b>Pop-out widget</b><small>always on top · Chrome/Edge</small></span><span class="mi-go" aria-hidden="true">↗</span></button>
         <button id="installBtn" class="menu-item" type="button" hidden><span class="mi-icon" aria-hidden="true">📲</span><span class="mi-text"><b>Add to Home Screen</b><small>open it like an app</small></span><span class="mi-go" aria-hidden="true">＋</span></button>
       </div>
@@ -168,6 +169,7 @@
   </div>
 </div>
 <div id="tvLayer" aria-hidden="true">
+  <div class="tv-hint" id="tvHint" role="status" hidden></div>
   <div class="tv" id="tv" data-ch="1" role="dialog" aria-label="Just listen — retro TV">
     <div class="tv-body">
       <div class="tv-bezel">
@@ -198,6 +200,7 @@
           <button class="tv-btn" type="button" data-tv="next" title="Next song" aria-label="Next song">⏭</button>
           <button class="tv-btn" type="button" data-tv="fx" aria-pressed="false" title="Stronger CRT effect">FX</button>
           <button class="tv-btn" type="button" data-tv="era" title="Picture tube: 80s (tap for the next decade)">'80</button>
+          <button class="tv-btn" type="button" data-tv="big" aria-pressed="false" title="Big screen: for the TV, casting or AirPlay (F)" aria-label="Big screen">⛶</button>
           <button class="tv-btn" type="button" data-tv="pip" hidden title="Float the TV over other apps (picture-in-picture)" aria-label="Picture-in-picture">PiP</button>
         </div>
         <span class="tv-led" id="tvLed" aria-hidden="true"></span>
