@@ -1,4 +1,4 @@
-/* ---------- Just listen: an 80s/90s plastic TV (sized in cqw so it scales with its pop-out window) ---------- */
+/* ---------- Just listen: a plastic TV with a 70s, 80s or 90s picture tube (sized in cqw so it scales with its pop-out window) ---------- */
 #tvLayer {
   position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem;
   background: rgba(8, 4, 6, 0.74); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
@@ -31,11 +31,18 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 /* the CRT, layer by layer: bloom lets bright parts bleed over the gaps, soft beam lines sized to the screen
    (~200 of them, never finer than 3px so they don't shimmer), an RGB aperture grille, and a slow rolling band */
 .tv-screen { --line: 3px; --gap: 1px; --grille: max(3px, 0.36cqw); } /* --line/--gap are set in whole device pixels by tvScanlines() */
-.crt-bloom, .crt-lines, .crt-grille, .crt-roll { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.crt-tint, .crt-bloom, .crt-wires, .crt-lines, .crt-grille, .crt-roll { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+/* bloom: only what's bright survives the contrast push, then it's blurred and added back on top, so light spills
+   over the dark around it while black stays black. How far and how strong depends on the tube (see the eras below) */
+.tv-screen { --bloom-o: 0.45; --bloom-r: 0.55cqw; --bloom-c: 1.9; }
 .crt-bloom {
-  z-index: 5; mix-blend-mode: screen; opacity: 0.4;
-  -webkit-backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2); backdrop-filter: blur(0.4cqw) brightness(1.2) saturate(1.2);
+  z-index: 5; mix-blend-mode: screen; opacity: var(--bloom-o);
+  -webkit-backdrop-filter: contrast(var(--bloom-c)) brightness(0.9) blur(var(--bloom-r)) saturate(1.25);
+  backdrop-filter: contrast(var(--bloom-c)) brightness(0.9) blur(var(--bloom-r)) saturate(1.25);
 }
+/* the tube's colour: off on the 80s set, faded and warm on the 70s one, punchy on the 90s one */
+.crt-tint { z-index: 5; display: none; }
+.crt-wires { z-index: 6; display: none; }
 /* the beam lines are drawn on a canvas, one row per physical pixel, lined up with the screen's pixel grid
    (a CSS gradient pattern smears into grey at 125% display scaling) */
 .crt-lines { z-index: 6; mix-blend-mode: multiply; width: 100%; opacity: 0.6; image-rendering: pixelated; }
@@ -52,7 +59,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 .tv.strong .crt-lines { opacity: 0.78; animation: crt-interlace 0.067s steps(1) infinite; }
 .tv.strong .crt-grille { opacity: 0.26; }
 .tv.strong .crt-roll { opacity: 1; animation-duration: 5s; }
-.tv.strong .crt-bloom { opacity: 0.5; }
+.tv.strong .crt-bloom { opacity: calc(var(--bloom-o) * 1.3); }
 @keyframes crt-interlace { 50% { translate: 0 var(--gap); } }
 .tv-screen::after {
   content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
@@ -228,6 +235,80 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 .tv-video { position: absolute; right: 0.5rem; bottom: 0.5rem; width: 7.5rem; height: 6.5rem; opacity: 0.01; pointer-events: none; }
 .tv-btn[hidden] { display: none; }
 #tvLayer.vpip .tv-btn[data-tv="pip"] { color: #ffc23d; }
+/* ---------- the picture tube, by decade (the '80 button on the set, or E). The 80s look is everything above ---------- */
+.tv-screen.blanking .tv-content, .tv-screen.blanking #tvArt, .tv-screen.blanking #tvCap { visibility: hidden; }
+.tv-screen.rolling .tv-content { animation: v-roll 520ms cubic-bezier(0.25, 0.7, 0.3, 1) both; }
+@keyframes v-roll { 0% { transform: translateY(-70%); } 45% { transform: translateY(9%); } 70% { transform: translateY(-3%); } 100% { transform: none; } }
+.bluescreen { position: absolute; inset: 0; display: grid; place-items: center; background: #0a22d8; }
+.bluescreen b { font-weight: 400; font-size: 7cqw; letter-spacing: 0.1em; color: #fff; text-shadow: 0.3cqw 0.3cqw 0 #000; }
+
+/* 70s: an old shadow-mask tube on a weak signal. Soft, wide glow; faded, warm colour with lifted blacks; a faint
+   ghost to the right of everything; coarse lines over a dot mask; a dark hum bar creeping up; a rounder, more
+   curved face. Changing channel snows longer and the picture rolls before it locks */
+.tv[data-era="70"] .tv-screen {
+  --bloom-o: 0.62; --bloom-r: 1.1cqw; --bloom-c: 1.8;
+  border-radius: 14% / 19%; clip-path: inset(0 round 14% / 19%);
+  text-shadow: 0 0 0.8cqw currentColor, 1.1cqw 0 0.15cqw rgba(255, 236, 205, 0.16), 0.25cqw 0 0 rgba(255, 90, 40, 0.28);
+}
+.tv[data-era="70"] #tvQueue, .tv[data-era="70"] #tvNew { text-shadow: 0 0 0.7cqw currentColor, 1.1cqw 0 0.15cqw rgba(255, 236, 205, 0.16); }
+.tv[data-era="70"] #tvCap { text-shadow: 0 0 1cqw currentColor, 1.3cqw 0 0.2cqw rgba(255, 236, 205, 0.18), 0 0.3cqw 0.6cqw #000; }
+.tv[data-era="70"] #tvArt { filter: drop-shadow(1.1cqw 0 0.3cqw rgba(255, 240, 220, 0.12)); box-shadow: none; }
+.tv[data-era="70"] .crt-tint {
+  display: block;
+  -webkit-backdrop-filter: sepia(0.3) saturate(0.85) contrast(0.9) brightness(1.2);
+  backdrop-filter: sepia(0.3) saturate(0.85) contrast(0.9) brightness(1.2);
+}
+.tv[data-era="70"] .crt-lines { opacity: 0.52; }
+.tv[data-era="70"] .crt-grille {
+  --m: max(4px, 0.62cqw); opacity: 0.1;
+  background:
+    radial-gradient(circle, #ff3a3a 0 28%, transparent 34%) 0 0 / var(--m) var(--m),
+    radial-gradient(circle, #3aff5a 0 28%, transparent 34%) calc(var(--m) / 3) calc(var(--m) / 2) / var(--m) var(--m),
+    radial-gradient(circle, #3a5aff 0 28%, transparent 34%) calc(var(--m) * 2 / 3) 0 / var(--m) var(--m);
+}
+.tv[data-era="70"] .crt-roll {
+  mix-blend-mode: normal; opacity: 1; animation-duration: 13s; animation-direction: reverse;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.07) 35%, rgba(0, 0, 0, 0.12) 50%, rgba(0, 0, 0, 0.07) 65%, transparent 100%) 0 0 / 100% 45% no-repeat;
+}
+.tv[data-era="70"] .tv-screen::after {
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.68) 100%),
+    linear-gradient(155deg, rgba(255, 250, 235, 0.16) 0%, rgba(255, 250, 235, 0.05) 24%, transparent 36%);
+}
+.tv[data-era="70"] .tv-osd { background: none; color: #fff1d8; text-shadow: 0 0 1cqw rgba(255, 220, 170, 0.9); }
+
+/* 90s: a flat, sharp Trinitron-style tube. Tight glow, rich colour, clean text, fine lines, a crisp vertical grille
+   with its two thin damper wires, almost square corners. It cuts to black between channels, shows a blue screen
+   when there's nothing on, and has the big green outlined channel read-out */
+.tv[data-era="90"] .tv-screen {
+  --bloom-o: 0.32; --bloom-r: 0.35cqw; --bloom-c: 2.2; --grille: max(2px, 0.26cqw);
+  border-radius: 3% / 4%; clip-path: inset(0 round 3% / 4%);
+  text-shadow: 0 0 0.45cqw currentColor;
+}
+.tv[data-era="90"] #tvQueue, .tv[data-era="90"] #tvNew { text-shadow: 0 0 0.35cqw currentColor; }
+.tv[data-era="90"] #tvArt { filter: saturate(1.12) contrast(1.06); box-shadow: none; }
+.tv[data-era="90"] .crt-tint {
+  display: block;
+  -webkit-backdrop-filter: saturate(1.22) contrast(1.06); backdrop-filter: saturate(1.22) contrast(1.06);
+}
+.tv[data-era="90"] .crt-lines { opacity: 0.42; }
+.tv[data-era="90"] .crt-grille { opacity: 0.2; }
+.tv[data-era="90"] .crt-roll { display: none; }
+.tv[data-era="90"] .crt-wires {
+  display: block; opacity: 0.5;
+  background:
+    linear-gradient(180deg, transparent calc(33% - 0.5px), #000 calc(33% - 0.5px) calc(33% + 0.5px), transparent calc(33% + 0.5px)),
+    linear-gradient(180deg, transparent calc(67% - 0.5px), #000 calc(67% - 0.5px) calc(67% + 0.5px), transparent calc(67% + 0.5px));
+}
+.tv[data-era="90"] .tv-screen::after {
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 70%, rgba(0, 0, 0, 0.32) 100%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 30%, transparent 42%);
+}
+.tv[data-era="90"] .tv-osd {
+  left: 6cqw; right: auto; top: 4cqw; background: none; color: #3dff5c; font-size: 8.5cqw;
+  text-shadow: 0.35cqw 0 0 #000, -0.35cqw 0 0 #000, 0 0.35cqw 0 #000, 0 -0.35cqw 0 #000, 0 0 1cqw rgba(61, 255, 92, 0.6);
+}
 @media (prefers-reduced-motion: reduce) {
   .lava i, .disc, .led, .led::after, .shake, .plus, #answer.pop, #vsResult.pop, .karaoke p.now.pop { animation: none; }
   .confetti { display: none; }
@@ -235,7 +316,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
   .flame.out { animation: none; opacity: 0; }
   .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
   #cover.flipped .cover-back img, #ambient i { animation: none; }
-  .tv .tv-content, .tv.strong .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
+  .tv .tv-content, .tv.strong .tv-content, .tv-screen.rolling .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
   button:active { transform: none; }
   .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
 }

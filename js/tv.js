@@ -1,5 +1,9 @@
 // ---------- Just listen: the retro TV (its own pop-out window, or a full-page overlay where there's no PiP) ----------
 const tv = { clean: false, open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
+// the picture tube: a soft, warm, ghosty 70s set, the 80s one, or a sharp, vivid, flat 90s one
+const TV_ERAS = { 70: { lines: 180, gap: 0.42 }, 80: { lines: 220, gap: 0.4 }, 90: { lines: 300, gap: 0.34 } };
+tv.era = 80;
+try { const e = Number(localStorage.getItem("gtt_tv_era")); if (TV_ERAS[e]) tv.era = e; } catch {}
 try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; tv.clean = localStorage.getItem("gtt_tv_clean") === "1"; } catch {}
 const TV_CHANNELS = { 1: "NOW", 2: "TEXT", 3: "QUEUE", 4: "COVER" };
 try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) tv.ch = c; } catch {} // the TV remembers its channel
@@ -97,8 +101,9 @@ function tvScanlines() {
   const r = T.screen.getBoundingClientRect();
   if (!r.height) return;
   const H = Math.round(r.height * dpr) + 2;
-  const pitch = Math.max(dpr < 1.5 ? 2 : 3, Math.round((r.height * dpr) / 220)); // device pixels per line, ~220 lines
-  const gap = Math.max(1, Math.round(pitch * 0.4));
+  const look = TV_ERAS[tv.era];
+  const pitch = Math.max(dpr < 1.5 || tv.era === 90 ? 2 : 3, Math.round((r.height * dpr) / look.lines)); // device pixels per line
+  const gap = Math.max(1, Math.round(pitch * look.gap));
   const c = T.lines;
   c.width = 1;
   c.height = H;
@@ -146,6 +151,8 @@ function tvOsd(text) {
 // that window opened, so mixing them with the main page's clock kept the snow (and the hidden cover) up for
 // as long as the page had been open before the TV popped out. A safety timer ends it regardless.
 function tvStatic(ms = 320) {
+  if (tv.era === 90) { tvBlank(Math.min(ms, 280)); return; }
+  if (tv.era === 70) ms = Math.max(ms, 450); // an old tuner takes its time
   if (reduceMotion.matches) return;
   const c = T.snow;
   const win = c.ownerDocument.defaultView;
@@ -178,12 +185,48 @@ function tvWin() {
   return T.box.ownerDocument.defaultView || window;
 }
 
+// a 90s set mutes the picture to black between channels and songs instead of showing snow
+function tvBlank(ms) {
+  const s = T.screen;
+  const id = (tv.blankId = (tv.blankId || 0) + 1);
+  s.classList.add("blanking");
+  tvWin().setTimeout(() => { if (tv.blankId === id) s.classList.remove("blanking"); }, ms);
+}
+
+// a 70s set loses vertical hold for a moment when you change channel
+function tvRoll() {
+  if (reduceMotion.matches) return;
+  const s = T.screen;
+  s.classList.remove("rolling");
+  void s.offsetWidth;
+  s.classList.add("rolling");
+  tvWin().setTimeout(() => s.classList.remove("rolling"), 600);
+}
+
+function tvSetEra(era) {
+  tv.era = era;
+  try { localStorage.setItem("gtt_tv_era", String(era)); } catch {}
+  tvShowEra();
+  tvScanlines();
+  tvStatic(300);
+  tvOsd(era + "s");
+  tvTick(true);
+}
+
+function tvShowEra() {
+  T.box.dataset.era = String(tv.era);
+  const b = T.box.querySelector('[data-tv="era"]');
+  b.textContent = "'" + tv.era;
+  b.title = "Picture tube: " + tv.era + "s (tap for the next decade)";
+}
+
 function tvSetChannel(ch) {
   if (tv.ch === ch) return;
   tv.ch = ch;
   try { localStorage.setItem("gtt_tv_ch", String(ch)); } catch {}
   tvShowChannel();
   tvStatic(260);
+  if (tv.era === 70) tvRoll();
   tvOsd("CH " + ch + " " + TV_CHANNELS[ch]);
   if ((ch === 3 || (ch === 2 && tv.page === 400)) && Date.now() - tv.queueAt > 5000) tvLoadQueue();
   tvTick(true);
@@ -227,8 +270,14 @@ function el(tag, cls, text) {
 }
 
 function tvNoSignal(box, label) {
-  if (box.dataset.view === "nosignal:" + label) return;
-  box.dataset.view = "nosignal:" + label;
+  if (box.dataset.view === "nosignal:" + label + tv.era) return;
+  box.dataset.view = "nosignal:" + label + tv.era;
+  if (tv.era === 90) { // the 90s answer to nothing on: a blue screen
+    const blue = el("div", "bluescreen");
+    blue.append(el("b", "", label));
+    box.replaceChildren(blue);
+    return;
+  }
   const card = el("div", "testcard");
   const bars = el("div", "bars");
   for (let i = 0; i < 7; i++) bars.append(el("i"));
@@ -334,3 +383,109 @@ function tvToggleClean() {
   T.cap.classList.toggle("clean", tv.clean);
   tvOsd(tv.clean ? "INFO OFF" : "INFO ON");
 }
+
+// CH3: the queue as a teletext page — tap a row to jump there
+async function tvLoadQueue() {
+  if (!tv.open || tv.queueBusy) return;
+  tv.queueBusy = true;
+  try {
+    const q = await spotifyJson("https://api.spotify.com/v1/me/player/queue");
+    tv.queue = (q.queue || []).filter((x) => x && x.uri).slice(0, 8);
+  } catch (e) {
+    tv.queue = null;
+  }
+  tv.queueAt = Date.now();
+  tv.queueBusy = false;
+  tvRenderQueue();
+}
+
+function tvRenderQueue() {
+  const box = T.queue;
+  const head = el("div", "tt-head");
+  const now = new Date();
+  head.append(el("b", "", "P333"), el("span", "", "GROOVTEXT"), el("span", "", now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })));
+  const title = el("div", "tt-title", "UP NEXT");
+  const list = el("div", "tt-list");
+  if (!tv.queue) list.append(el("div", "tt-empty", "PAGE NOT FOUND — couldn't read the queue"));
+  else if (!tv.queue.length) list.append(el("div", "tt-empty", "NOTHING QUEUED"));
+  else tv.queue.forEach((item, i) => {
+    const row = el("button", "tt-row");
+    row.type = "button";
+    const name = el("span");
+    const by = (item.artists || []).map((a) => a.name).join(", ") || (item.show && item.show.name) || "";
+    name.append(item.name + " ", el("em", "", by));
+    row.append(el("i", "", String(i + 1)), name);
+    row.title = "Play " + item.name + " now";
+    row.onclick = () => tvJump(i, item);
+    list.append(row);
+  });
+  const fast = el("div", "fastext");
+  [["PREV", "prev"], ["PLAY", "play"], ["NEXT", "next"], ["REFRESH", "refresh"]].forEach(([label, act]) => {
+    const b = el("button", "", label);
+    b.type = "button";
+    b.onclick = () => (act === "refresh" ? tvLoadQueue() : tvAction(act));
+    fast.append(b);
+  });
+  box.dataset.view = "queue";
+  box.replaceChildren(head, title, list, fast);
+}
+
+async function tvJump(i, item) {
+  tvStatic(500);
+  tvOsd("▶▶ " + (i + 1));
+  const ctx = state.context;
+  let res = null;
+  // jump straight there when the song is part of what's playing; otherwise skip ahead one by one
+  if (ctx && !/:artist:/.test(ctx)) { try { res = await playerCall("play", { context_uri: ctx, offset: { uri: item.uri } }); } catch {} }
+  if (!res || !res.ok) {
+    for (let k = 0; k <= i; k++) {
+      try { res = await api("https://api.spotify.com/v1/me/player/next", { method: "POST" }); } catch { res = null; }
+      if (!res || !res.ok) break;
+      await wait(350);
+    }
+  }
+  if (res && !res.ok) tvOsd(res.status === 403 ? "PREMIUM ONLY" : "ERR " + res.status);
+  setTimeout(pollSpotify, 600);
+  setTimeout(tvLoadQueue, 1200);
+}
+
+async function tvAction(act) {
+  if (act === "play") { toggleVinyl(); tvOsd(els.stage.classList.contains("playing") ? "▶" : "❚❚"); return; }
+  if (act === "fx") {
+    tv.fx = !tv.fx;
+    try { localStorage.setItem("gtt_tv_fx", tv.fx ? "1" : "0"); } catch {}
+    T.box.classList.toggle("strong", tv.fx);
+    T.box.querySelector('[data-tv="fx"]').setAttribute("aria-pressed", String(tv.fx));
+    tvOsd(tv.fx ? "FX STRONG" : "FX SOFT");
+    return;
+  }
+  if (act === "power") { closeTV(); return; }
+  if (act === "era") { tvSetEra(tv.era === 70 ? 80 : tv.era === 80 ? 90 : 70); return; }
+  if (act === "pip") { vpipEnter(); return; }
+  const path = act === "prev" ? "previous" : "next";
+  tvOsd(act === "prev" ? "⏮" : "⏭");
+  let res = null;
+  try { res = await api("https://api.spotify.com/v1/me/player/" + path, { method: "POST" }); } catch {}
+  if (!res || !res.ok) { tvOsd(!res ? "NO SIGNAL" : res.status === 403 ? "PREMIUM ONLY" : res.status === 404 ? "NO PLAYER" : "ERR " + res.status); return; }
+  setTimeout(pollSpotify, 500);
+}
+
+function tvKeys(e) {
+  if (!tv.open || e.target.closest && e.target.closest("input")) return;
+  if (["1", "2", "3", "4"].includes(e.key)) tvSetChannel(Number(e.key));
+  else if (e.key === " ") { e.preventDefault(); tvAction("play"); }
+  else if (e.key === "ArrowRight") tvAction("next");
+  else if (e.key === "ArrowLeft") tvAction("prev");
+  else if (e.key === "Escape") closeTV();
+  else if (e.key === "e" || e.key === "E") tvAction("era");
+  else if ((e.key === "i" || e.key === "I") && tv.ch === 4) tvToggleClean();
+}
+
+tvShowEra();
+T.box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => { b.onclick = () => tvSetChannel(Number(b.dataset.ch)); });
+T.box.querySelectorAll("[data-tv]").forEach((b) => { b.onclick = () => tvAction(b.dataset.tv); });
+T.layer.addEventListener("click", (e) => { if (e.target.id === "tvLayer") closeTV(); });
+T.screen.addEventListener("click", () => { if (tv.ch === 4) tvToggleClean(); });
+document.addEventListener("keydown", tvKeys);
+addEventListener("resize", () => { if (tv.open && !tv.pip) tvScanlines(); });
+$("tvBtn").onclick = openTV;
