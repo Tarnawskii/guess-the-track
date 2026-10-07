@@ -836,15 +836,37 @@
   }
   /* CH4: the cover fills the whole screen (cropped top and bottom to the 4:3 tube), under the CRT layers */
   .tv[data-ch="4"] #tvArt.has { left: 0 !important; top: 0 !important; width: 100% !important; height: 100%; aspect-ratio: auto; border-radius: 0; }
-  .cover-cap {
-    position: absolute; z-index: 5; left: 50%; bottom: 7%; max-width: 84%; translate: -50% 0;
-    padding: 0.4cqw 2cqw; border-radius: 0.6cqw; background: rgba(0, 0, 0, 0.72);
-    font-size: 5.2cqw; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    opacity: 0; transition: opacity 700ms var(--ease);
+  /* CH4's caption: name, artist and where in the song we are, like a music channel's lower third. It sits next to
+     the cover (not inside the channel layer, which FX animates) so it always stays on top of it */
+  #tvCap {
+    position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; display: none; padding: 14cqw 9cqw 6.5cqw;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.86) 0%, rgba(0, 0, 0, 0.66) 55%, transparent 100%);
+    color: #fff; text-shadow: 0 0 0.6cqw currentColor, 0 0.3cqw 0.6cqw #000; pointer-events: none;
+    transition: opacity 400ms var(--ease);
   }
-  .cover-cap.show { opacity: 1; transition: opacity 250ms var(--ease); }
-  .tv[data-ch="4"] .tv-osd { z-index: 6; }
-  .cover-cap em { font-style: normal; color: #7ff6ff; }
+  .tv[data-ch="4"] #tvCap.has { display: grid; gap: 0.6cqw; }
+  .tv-screen.power-on #tvCap, .tv-screen.power-off #tvCap, .tv-screen.snowing #tvCap { opacity: 0; transition: none; }
+  #tvCap.in { animation: cap-in 700ms var(--ease-out) both; }
+  @keyframes cap-in { from { opacity: 0; transform: translateX(-4cqw); } }
+  .cap-song { font-size: 7.4cqw; line-height: 1; color: #ffe95c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cap-artist { font-size: 5cqw; line-height: 1; color: #7ff6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cap-prog { display: flex; align-items: center; gap: 2cqw; margin-top: 1.4cqw; font-size: 4.2cqw; line-height: 1; }
+  .cap-bar { position: relative; flex: 1; height: 0.8cqw; border-radius: 0.4cqw; background: rgba(255, 255, 255, 0.24); }
+  .cap-bar::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); border-radius: inherit;
+    background: #fff; box-shadow: 0 0 1.2cqw rgba(255, 255, 255, 0.7);
+  }
+  .cap-bar::after {
+    content: ""; position: absolute; top: 50%; left: var(--p, 0%); width: 2.2cqw; height: 2.2cqw; border-radius: 50%;
+    translate: -50% -50%; background: #fff; box-shadow: 0 0 1.4cqw #fff;
+  }
+  #tvCap.paused .cap-at { animation: blink 1s steps(2) infinite; }
+  #tvCap.paused .cap-bar::before, #tvCap.paused .cap-bar::after { background: #bdb6c4; box-shadow: none; }
+  /* "clean" (tap the screen or press I): just the cover and the line */
+  #tvCap.clean { padding-top: 4cqw; background: linear-gradient(0deg, rgba(0, 0, 0, 0.45), transparent); }
+  #tvCap.clean .cap-song, #tvCap.clean .cap-artist { display: none; }
+  .tv.strong #tvCap { animation: tv-flicker 0.14s steps(2) infinite; }
+  .tv[data-ch="4"] .tv-screen { cursor: pointer; }
   .tv-screen.power-on #tvArt, .tv-screen.power-off #tvArt, .tv-screen.snowing #tvArt { opacity: 0; transition: none; }
   .vhs-bottom a { color: #1ed760; text-decoration: none; font-size: 4.6cqw; }
   .now-text { display: grid; gap: 1.2cqw; min-width: 0; }
@@ -1095,6 +1117,7 @@
             <div class="tv-ch" id="tvCover"></div>
           </div>
           <img id="tvArt" alt="" />
+          <div id="tvCap" aria-live="off"></div>
           <canvas class="tv-static" id="tvStatic" width="120" height="90"></canvas>
           <div class="tv-osd" id="tvOsd"></div>
           <div class="crt-bloom"></div><canvas class="crt-lines" id="tvLines" width="1" height="1"></canvas><div class="crt-grille"></div><div class="crt-roll"></div>
@@ -4173,13 +4196,13 @@ document.addEventListener("keydown", radarEscape);
 // the new permissions need a fresh login, which goes through reconnect's "scores will reset" guard
 els.radarLogin.onclick = () => { sessionStorage.setItem("gtt_radar_login", "1"); els.reconnect.onclick(); };
 // ---------- Just listen: the retro TV (its own pop-out window, or a full-page overlay where there's no PiP) ----------
-const tv = { open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
-try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; } catch {}
+const tv = { clean: false, open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
+try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; tv.clean = localStorage.getItem("gtt_tv_clean") === "1"; } catch {}
 const TV_CHANNELS = { 1: "NOW", 2: "TEXT", 3: "QUEUE", 4: "COVER" };
 try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) tv.ch = c; } catch {} // the TV remembers its channel
 // grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
 const T = {
-  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"),
+  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"), cap: $("tvCap"),
   snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"), lines: $("tvLines"),
 };
 
@@ -4463,27 +4486,50 @@ function tvPlaceArt() {
   T.art.style.width = (slot.offsetWidth / w * 100).toFixed(2) + "%";
 }
 
-// CH4: the cover as big as the screen allows, untouched, on a glow of its own two main colours
+// CH4: the cover over the whole screen, on a glow of its own two main colours, with a lower third:
+// the song, the artist and a line that shows how far into the song we are
+function mss(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
 function tvRenderCover(force) {
   const box = T.cover;
+  const cap = T.cap;
   const t = state.track;
-  if (!t) return;
+  if (!t) { cap.classList.remove("has"); return; }
   if (force || box.dataset.view !== "cover:" + tv.key) {
+    const fresh = box.dataset.view !== "cover:" + tv.key;
     box.dataset.view = "cover:" + tv.key;
     box.dataset.colors = "";
-    const cap = el("div", "cover-cap show");
-    cap.append(t.song + "  ", el("em", "", t.artists.join(", ")));
-    box.replaceChildren(cap);
+    box.replaceChildren();
+    const prog = el("div", "cap-prog");
+    prog.append(el("span", "cap-at"), el("i", "cap-bar"), el("span", "cap-len"));
+    cap.replaceChildren(el("div", "cap-song", t.song), el("div", "cap-artist", t.artists.join(", ")), prog);
+    cap.classList.add("has");
+    cap.classList.toggle("clean", tv.clean);
+    if (fresh && !reduceMotion.matches) { cap.classList.remove("in"); void cap.offsetWidth; cap.classList.add("in"); }
     if (t.artUrl) { T.art.src = t.artUrl; T.art.classList.add("has"); } else T.art.classList.remove("has");
-    // a lower third for the new song, then the whole screen is the cover
-    tvWin().setTimeout(() => cap.classList.remove("show"), 4500);
   }
+  const dur = state.trackDuration || t.duration || 0;
+  const at = Math.min(currentElapsed(), dur);
+  cap.classList.toggle("paused", !els.stage.classList.contains("playing"));
+  cap.querySelector(".cap-at").textContent = mss(at);
+  cap.querySelector(".cap-len").textContent = mss(dur);
+  cap.querySelector(".cap-bar").style.setProperty("--p", (dur ? Math.min(100, (at / dur) * 100) : 0).toFixed(2) + "%");
   const cols = state.colors && state.colors.key === tv.key ? state.colors.colors : null;
   if (box.dataset.colors !== String(cols)) {
     box.dataset.colors = String(cols);
     if (cols) { box.style.setProperty("--c1", cols[0]); box.style.setProperty("--c2", cols[1]); }
     else { box.style.removeProperty("--c1"); box.style.removeProperty("--c2"); }
   }
+}
+
+function tvToggleClean() {
+  tv.clean = !tv.clean;
+  try { localStorage.setItem("gtt_tv_clean", tv.clean ? "1" : "0"); } catch {}
+  T.cap.classList.toggle("clean", tv.clean);
+  tvOsd(tv.clean ? "INFO OFF" : "INFO ON");
 }
 
 // ---------- CH2: GROOVTEXT, a teletext service ----------
@@ -4855,11 +4901,13 @@ function tvKeys(e) {
   else if (e.key === "ArrowRight") tvAction("next");
   else if (e.key === "ArrowLeft") tvAction("prev");
   else if (e.key === "Escape") closeTV();
+  else if ((e.key === "i" || e.key === "I") && tv.ch === 4) tvToggleClean();
 }
 
 T.box.querySelectorAll(".tv-btn[data-ch]").forEach((b) => { b.onclick = () => tvSetChannel(Number(b.dataset.ch)); });
 T.box.querySelectorAll("[data-tv]").forEach((b) => { b.onclick = () => tvAction(b.dataset.tv); });
 T.layer.addEventListener("click", (e) => { if (e.target.id === "tvLayer") closeTV(); });
+T.screen.addEventListener("click", () => { if (tv.ch === 4) tvToggleClean(); });
 document.addEventListener("keydown", tvKeys);
 addEventListener("resize", () => { if (tv.open && !tv.pip) tvScanlines(); });
 $("tvBtn").onclick = openTV;
@@ -4955,14 +5003,24 @@ function drawTvFrame() {
     const art = vpipImage(t.artUrl);
     const sw = art.naturalWidth, sh = sw * (S.h / S.w);
     ctx.drawImage(art, 0, (art.naturalHeight - sh) / 2, sw, sh, S.x, S.y, S.w, S.h);
-    if (Date.now() - (vpip.keyAt || 0) < 4500) {
-      ctx.font = "30px VT323, ui-monospace, Menlo, monospace";
-      const label = t.song + "  " + t.artists.join(", ");
-      const w = Math.min(S.w * 0.84, ctx.measureText(label).width + 28);
-      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
-      rrect(ctx, S.x + (S.w - w) / 2, S.y + S.h * 0.8, w, 40, 6); ctx.fill();
-      vpipText(ctx, label, S.x + (S.w - w) / 2 + 14, S.y + S.h * 0.8 + 30, 30, "#ffffff", w - 28);
+    // the same lower third as the TV: song, artist, and the line showing where in the song we are
+    const sh2 = ctx.createLinearGradient(0, S.y + S.h * 0.5, 0, S.y + S.h);
+    sh2.addColorStop(0, "rgba(0,0,0,0)"); sh2.addColorStop(0.45, "rgba(0,0,0,0.66)"); sh2.addColorStop(1, "rgba(0,0,0,0.86)");
+    const L = S.x + 48, R = S.x + S.w - 48;
+    if (!tv.clean) {
+      ctx.fillStyle = sh2; ctx.fillRect(S.x, S.y + S.h * 0.5, S.w, S.h * 0.5);
+      vpipText(ctx, t.song, L, S.y + S.h - 104, 40, "#ffe95c", R - L);
+      vpipText(ctx, t.artists.join(", "), L, S.y + S.h - 72, 28, "#7ff6ff", R - L);
     }
+    const dur = state.trackDuration || t.duration || 0;
+    const at = Math.min(currentElapsed(), dur), p = dur ? at / dur : 0;
+    const y = S.y + S.h - 42;
+    vpipText(ctx, mss(at), L, y + 8, 24, "#ffffff", 70);
+    vpipText(ctx, mss(dur), R - 52, y + 8, 24, "#ffffff", 60);
+    const bx = L + 66, bw = R - 62 - bx;
+    ctx.fillStyle = "rgba(255,255,255,0.24)"; rrect(ctx, bx, y - 2, bw, 5, 2.5); ctx.fill();
+    ctx.fillStyle = "#ffffff"; rrect(ctx, bx, y - 2, Math.max(5, bw * p), 5, 2.5); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * p, y + 0.5, 7, 0, Math.PI * 2); ctx.fill();
   } else {
     const playing = els.stage.classList.contains("playing");
     vpipText(ctx, playing ? "▶ PLAY" : "❚❚ PAUSE", S.x + 34, S.y + 50, 30, "#ffffff", 200);
