@@ -213,9 +213,9 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
   background: linear-gradient(180deg, #f2eff5, #8a8590); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .tv-grille { flex: 1; height: 4.6cqw; border-radius: 1cqw; background: repeating-linear-gradient(90deg, #121114 0 0.7cqw, transparent 0.7cqw 1.6cqw); opacity: 0.85; }
-.tv-btns { display: flex; gap: 1.1cqw; }
+.tv-btns { display: flex; gap: 0.9cqw; }
 .tv-btn {
-  width: 6.6cqw; height: 5cqw; min-height: 0; padding: 0; border-radius: 0.9cqw;
+  width: 6cqw; height: 5cqw; min-height: 0; padding: 0; border-radius: 0.9cqw;
   font: 700 2.9cqw/1 -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #d8d3dc;
   background: linear-gradient(180deg, #4d4a54, #2a292f); box-shadow: 0 0.45cqw 0 #111013, inset 0 0.2cqw 0 rgba(255, 255, 255, 0.16);
   transition: transform 80ms var(--ease), box-shadow 80ms var(--ease), color 150ms var(--ease);
@@ -230,11 +230,34 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 }
 .tv-led { width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: #3dff7a; box-shadow: 0 0 1.2cqw #3dff7a; }
 .tv-led.standby { background: #ff3b30; box-shadow: 0 0 1.2cqw #ff3b30; }
-#app.guest #tvBtn, #app.lobby #tvBtn { display: none; }
+#app.guest #tvBtn, #app.lobby #tvBtn, #app.guest #castBtn, #app.lobby #castBtn { display: none; }
 /* the video the TV is streamed into for picture-in-picture: kept in view (iOS pauses videos it can't see), but invisible */
 .tv-video { position: absolute; right: 0.5rem; bottom: 0.5rem; width: 7.5rem; height: 6.5rem; opacity: 0.01; pointer-events: none; }
 .tv-btn[hidden] { display: none; }
 #tvLayer.vpip .tv-btn[data-tv="pip"] { color: #ffc23d; }
+/* ---------- big screen (⛶ or F): just the tube, as large as the window allows, black around it, for the TV,
+   casting or AirPlay. The controls float over the bottom of the picture and fade out with the mouse ---------- */
+#tvLayer.big { padding: 0; background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
+#tvLayer.big .tv { position: relative; width: min(100vw, 100dvh * 4 / 3); }
+#tvLayer.big .tv-body, #tvLayer.big .tv-bezel { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+#tvLayer.big .tv-body::before, #tvLayer.big .tv-body::after, #tvLayer.big .tv-brand, #tvLayer.big .tv-grille { display: none; }
+#tvLayer.big .tv-panel {
+  position: absolute; z-index: 10; left: 50%; bottom: 3cqw; margin: 0; padding: 1.4cqw 2.4cqw; border-radius: 3cqw;
+  background: rgba(20, 19, 23, 0.9); box-shadow: 0 1cqw 4cqw rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%) scale(0.6); transform-origin: 50% 100%; transition: opacity 400ms var(--ease);
+}
+#tvLayer.big .tv-btn[data-tv="pip"] { display: none; }
+#tvLayer.big.idle { cursor: none; }
+#tvLayer.big.idle .tv-panel { opacity: 0; pointer-events: none; }
+.tv-hint {
+  position: absolute; z-index: 2; top: max(1rem, env(safe-area-inset-top)); left: 50%; translate: -50% 0; width: min(30rem, calc(100vw - 2rem));
+  display: grid; gap: 0.25rem; padding: 0.75rem 1rem; border-radius: 0.875rem; background: rgba(20, 19, 23, 0.94);
+  box-shadow: 0 0 0 1px var(--hairline), 0 0.75rem 2rem rgba(0, 0, 0, 0.6); color: var(--cream); font-size: 0.875rem; cursor: pointer;
+}
+.tv-hint b { font-weight: 700; }
+.tv-hint span { font-size: 0.75rem; color: var(--label2); }
+.tv-hint[hidden] { display: none; }
+
 /* ---------- the picture tube, by decade (the '80 button on the set, or E). The 80s look is everything above ---------- */
 .tv-screen.blanking .tv-content, .tv-screen.blanking #tvArt, .tv-screen.blanking #tvCap { visibility: hidden; }
 .tv-screen.rolling .tv-content { animation: v-roll 520ms cubic-bezier(0.25, 0.7, 0.3, 1) both; }
