@@ -15,8 +15,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=VT323&display=swap" />
-<link rel="stylesheet" href="css/app.css" />
-<link rel="stylesheet" href="css/tv.css" />
+<script>
+  // Each deploy gets fresh file URLs (?v= the page's own Last-Modified, which GitHub Pages stamps per deploy), so a
+  // browser never runs a new page with old cached scripts or the other way round. Written in, not added later, so
+  // the files still load in order and block like plain tags. No Last-Modified (a local server) → "now", no caching.
+  window.GTT_V = Date.parse(document.lastModified) || Date.now();
+  document.write(["app", "tv"].map((n) => '<link rel="stylesheet" href="css/' + n + '.css?v=' + GTT_V + '" />').join(""));
+</script>
 </head>
 <body>
 <div id="ambient" aria-hidden="true"><i></i><i></i></div>
@@ -201,20 +206,10 @@
     </div>
   </div>
 </div>
-<script src="js/core.js"></script>
-<script src="js/turntable.js"></script>
-<script src="js/round.js"></script>
-<script src="js/versus.js"></script>
-<script src="js/spotify.js"></script>
-<script src="js/menu.js"></script>
-<script src="js/lyrics.js"></script>
-<script src="js/online.js"></script>
-<script src="js/lobby.js"></script>
-<script src="js/modes.js"></script>
-<script src="js/radar.js"></script>
-<script src="js/tv.js"></script>
-<script src="js/groovtext.js"></script>
-<script src="js/tv-video.js"></script>
-<script src="js/boot.js"></script>
+<script>
+  // plain scripts sharing one global scope, in this order (see the top of js/core.js)
+  ["core", "turntable", "round", "versus", "spotify", "menu", "lyrics", "online", "lobby", "modes", "radar", "tv", "groovtext", "tv-video", "boot"]
+    .forEach((n) => document.write('<script src="js/' + n + '.js?v=' + GTT_V + '"><\/script>'));
+</script>
 </body>
 </html>

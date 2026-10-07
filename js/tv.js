@@ -216,6 +216,7 @@ function tvSetEra(era) {
 function tvShowEra() {
   T.box.dataset.era = String(tv.era);
   const b = T.box.querySelector('[data-tv="era"]');
+  if (!b) return;
   b.textContent = "'" + tv.era;
   b.title = "Picture tube: " + tv.era + "s (tap for the next decade)";
 }
@@ -462,6 +463,7 @@ async function tvAction(act) {
   if (act === "power") { closeTV(); return; }
   if (act === "era") { tvSetEra(tv.era === 70 ? 80 : tv.era === 80 ? 90 : 70); return; }
   if (act === "pip") { vpipEnter(); return; }
+  if (act !== "prev" && act !== "next") return; // a button this version doesn't know does nothing, not "next song"
   const path = act === "prev" ? "previous" : "next";
   tvOsd(act === "prev" ? "⏮" : "⏭");
   let res = null;
