@@ -94,8 +94,8 @@ function ttNew() {
       setTimeout(pollSpotify, 600);
     }));
   });
-  if (!radar.loading) list.append(ttRow("↻", ["REFRESH"], "Search again", () => loadRadar(true)));
-  return { sig: "p200:" + radar.loading + ":" + radar.at + ":" + radar.releases.length + ":" + radar.done, list };
+  if (!radar.loading) list.append(ttRow("↻", ["REFRESH ", el("small", "", items.length && radar.error ? radar.error.toUpperCase() : "")], "Search again", () => loadRadar(true)));
+  return { sig: "p200:" + radar.loading + ":" + radar.at + ":" + radar.releases.length + ":" + radar.done + ":" + radar.error, list };
 }
 
 // put a song at the front of Spotify's queue
@@ -113,6 +113,7 @@ async function loadForYou(force) {
   if (!force && forYou.at && Date.now() - forYou.at < FORYOU_TTL && forYou.items.length) return;
   Object.assign(forYou, { loading: true, error: "", done: 0, total: 0 });
   tvRenderText(true);
+  while (radar.loading) await wait(500); // one big search at a time, or Spotify starts saying "slow down"
   try {
     const top = (range) => spotifyJson("https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=" + range).catch(() => ({ items: [] }));
     const [artists, ...tops] = await Promise.all([
@@ -129,11 +130,17 @@ async function loadForYou(force) {
     const pool = shuffled((artists.items || []).filter(Boolean)).slice(0, 8);
     forYou.total = pool.length;
     const picks = [];
-    let next = 0;
-    await Promise.all(Array.from({ length: 3 }, async () => {
+    let next = 0, problem = null;
+    await Promise.all(Array.from({ length: 2 }, async () => {
       while (next < pool.length) {
         const a = pool[next++];
-        try { picks.push(...(await deepCuts(a, known))); } catch (e) { console.warn("[gtt] for you", a.name, e); }
+        try { picks.push(...(await deepCuts(a, known))); }
+        catch (e) {
+          console.warn("[gtt] for you", a.name, e);
+          problem = e;
+          if (e.status === 429) next = pool.length;
+        }
+        await wait(150);
         forYou.done++;
         tvRenderText();
       }
@@ -145,11 +152,12 @@ async function loadForYou(force) {
     while (mixed.length < 12 && [...byArtist.values()].some((l) => l.length)) byArtist.forEach((l) => { if (l.length && mixed.length < 12) mixed.push(l.shift()); });
     forYou.items = mixed;
     forYou.at = Date.now();
-    if (!mixed.length) forYou.error = pool.length ? "NO DEEP CUTS FOUND — try ↻" : "PLAY SOME MORE MUSIC FIRST";
+    if (!mixed.length) forYou.error = problem ? spotifyProblem(problem).toUpperCase() : pool.length ? "NO DEEP CUTS FOUND — try ↻" : "PLAY SOME MORE MUSIC FIRST";
+    else if (problem && problem.status === 429) forYou.error = spotifyProblem(problem).toUpperCase(); // shown under the ones we got
     else try { localStorage.setItem("gtt_foryou", JSON.stringify({ at: forYou.at, items: mixed })); } catch {}
   } catch (e) {
     console.error("[gtt] for you failed", e);
-    forYou.error = e.status === 401 || e.status === 403 ? "SPOTIFY SAID NO — log in again" : "PAGE NOT FOUND — try ↻";
+    forYou.error = spotifyProblem(e).toUpperCase();
   }
   forYou.loading = false;
   tvRenderText(true);
@@ -194,8 +202,9 @@ function ttForYou() {
   else if (!items.length) list.append(el("div", "tt-empty", forYou.error || "NOTHING YET"));
   items.forEach((s, i) => list.append(ttRow(String(i + 1), [s.name + " ", el("em", "", s.artists + " "), el("small", "", s.year)],
     "Queue " + s.name + " (from " + s.album + ")", () => tvQueueTrack(s.uri))));
-  if (items.length && !forYou.loading) list.append(ttRow("↻", ["NEW PICKS ", el("small", "", "tap a song to queue it")], "Dig up new songs", () => loadForYou(true)));
-  return { sig: "p300:" + forYou.loading + ":" + forYou.at + ":" + forYou.done + ":" + items.length, list };
+  // the retry row also says what went wrong, if anything did
+  if (!forYou.loading) list.append(ttRow("↻", [items.length ? "NEW PICKS " : "TRY AGAIN ", el("small", "", items.length && forYou.error ? forYou.error : items.length ? "tap a song to queue it" : "")], "Dig up new songs", () => loadForYou(true)));
+  return { sig: "p300:" + forYou.loading + ":" + forYou.at + ":" + forYou.done + ":" + items.length + ":" + forYou.error, list };
 }
 
 // P400: what's on — the queue as a TV listing, with start times
@@ -239,7 +248,7 @@ async function loadCharts(force) {
     charts.artists = (ar.items || []).filter(Boolean).map((x) => ({ uri: x.uri, name: x.name, genre: (x.genres || [])[0] || "" }));
     charts.at = Date.now();
   } catch (e) {
-    charts.error = e.status === 401 || e.status === 403 ? "SPOTIFY SAID NO — log in again" : "PAGE NOT FOUND";
+    charts.error = spotifyProblem(e).toUpperCase();
   }
   charts.loading = false;
   tvRenderText(true);
