@@ -324,6 +324,7 @@ function tvTick(force) {
     if (tv.ch === 3) tvRenderQueue();
     if (tv.ch === 2) tvRenderText(true);
     if (tv.ch === 4) tvRenderCover(true);
+    likeCheck();
   }
   if (tv.ch === 1) tvRenderNow(force);
   if (tv.ch === 4) tvRenderCover(force);
@@ -372,7 +373,7 @@ function tvRenderNow(force) {
     const main = el("div", "now-main");
     const art = el("div", "now-slot");
     const text = el("div", "now-text");
-    text.append(el("div", "now-song", t.song), el("div", "now-artist", t.artists.join(", ")), el("div", "now-album", t.album || ""));
+    text.append(el("div", "now-song", t.song), el("div", "now-artist", t.artists.join(", ")), el("div", "now-album", t.album || ""), likeButton("now-like"));
     main.append(art, text);
     const bottom = el("div", "vhs-bottom");
     bottom.append(el("span", "vhs-time"), el("span", "vhs-bar"));
@@ -426,7 +427,7 @@ function tvRenderCover(force) {
     box.dataset.colors = "";
     box.replaceChildren();
     const prog = el("div", "cap-prog");
-    prog.append(el("span", "cap-at"), el("i", "cap-bar"), el("span", "cap-len"));
+    prog.append(el("span", "cap-at"), el("i", "cap-bar"), el("span", "cap-len"), likeButton("cap-like"));
     cap.replaceChildren(el("div", "cap-song", t.song), el("div", "cap-artist", t.artists.join(", ")), prog);
     cap.classList.add("has");
     cap.classList.toggle("clean", tv.clean);
@@ -445,6 +446,87 @@ function tvRenderCover(force) {
     if (cols) { box.style.setProperty("--c1", cols[0]); box.style.setProperty("--c2", cols[1]); }
     else { box.style.removeProperty("--c1"); box.style.removeProperty("--c2"); }
   }
+}
+
+// ---------- ♥: save the song to your Liked Songs, from CH1, CH4 or the L key ----------
+// Spotify's library endpoints since 2026: PUT / DELETE /me/library and GET /me/library/contains, by URI. They need
+// two permissions the first logins didn't ask for, so the first tap without them offers one more login
+const LIKE_SCOPES = ["user-library-read", "user-library-modify"];
+const likes = { key: null, on: null, busy: false, askedAt: 0 };
+
+function likeButton(cls) {
+  const b = el("button", "tv-like " + cls);
+  b.type = "button";
+  b.onclick = (e) => { e.stopPropagation(); tvLike(); }; // on CH4 a tap on the screen would hide the caption
+  likePaint(b);
+  return b;
+}
+
+function likePaint(b, pop) {
+  const on = likes.key === state.trackKey && likes.on;
+  const wide = b.classList.contains("now-like");
+  b.textContent = on ? (wide ? "♥ LIKED" : "♥") : (wide ? "♡ LIKE" : "♡");
+  b.classList.toggle("on", !!on);
+  b.setAttribute("aria-pressed", String(!!on));
+  b.setAttribute("aria-label", on ? "Remove from Liked Songs" : "Save to Liked Songs");
+  b.title = (on ? "In your Liked Songs — tap to remove" : "Save to your Liked Songs") + " (L)";
+  if (pop && !reduceMotion.matches) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); }
+}
+
+function tvShowLike(pop) {
+  T.box.querySelectorAll(".tv-like").forEach((b) => likePaint(b, pop));
+}
+
+function likeUri() {
+  return (state.track && state.track.uri) || "spotify:track:" + state.trackKey;
+}
+
+// is the new song in Liked Songs already? one small request per song
+async function likeCheck() {
+  const key = state.trackKey;
+  likes.key = key;
+  likes.on = null;
+  tvShowLike();
+  if (!key || !hasScopes(LIKE_SCOPES)) return;
+  try {
+    const d = await spotifyJson("https://api.spotify.com/v1/me/library/contains?uris=" + encodeURIComponent(likeUri()));
+    if (likes.key === key) { likes.on = !!(Array.isArray(d) ? d[0] : d); tvShowLike(); }
+  } catch {} // unknown: the heart stays empty and still works
+}
+
+async function tvLike() {
+  const key = state.trackKey;
+  if (!state.track || !key) return;
+  if (!hasScopes(LIKE_SCOPES)) {
+    if (Date.now() - likes.askedAt < 6000) {
+      // second tap: off to Spotify for the permission, and the TV comes back on afterwards
+      try { sessionStorage.setItem("gtt_open_tv", tv.big ? "big" : "1"); } catch {}
+      const armed = reconnectArmedAt;
+      await els.reconnect.onclick();
+      if (reconnectArmedAt !== armed) { likes.askedAt = Date.now(); tvOsd("AGAIN: SCORES RESET"); }
+      return;
+    }
+    likes.askedAt = Date.now();
+    tvOsd("♥ TAP AGAIN: LOGIN");
+    return;
+  }
+  if (likes.busy) return;
+  const on = !(likes.key === key && likes.on);
+  Object.assign(likes, { busy: true, key, on });
+  tvShowLike(true);
+  tvOsd(on ? "♥ LIKED" : "♡ REMOVED");
+  const uri = likeUri();
+  let res = null;
+  try {
+    res = await api("https://api.spotify.com/v1/me/library?uris=" + encodeURIComponent(uri), { method: on ? "PUT" : "DELETE" });
+    if (res.status === 400) { // in case this endpoint wants the URIs in the body after all
+      res = await api("https://api.spotify.com/v1/me/library", { method: on ? "PUT" : "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uris: [uri] }) });
+    }
+  } catch {}
+  likes.busy = false;
+  if (res && res.ok) return;
+  if (likes.key === key) { likes.on = !on; tvShowLike(); }
+  tvOsd(!res ? "NO SIGNAL" : res.status === 401 || res.status === 403 ? "♥ LOG IN AGAIN" : res.status === 429 ? "SPOTIFY SAYS WAIT" : "ERR " + res.status);
 }
 
 function tvToggleClean() {
@@ -552,6 +634,7 @@ function tvKeys(e) {
   else if (e.key === "f" || e.key === "F") tvAction("big");
   else if (e.key === "e" || e.key === "E") tvAction("era");
   else if ((e.key === "i" || e.key === "I") && tv.ch === 4) tvToggleClean();
+  else if (e.key === "l" || e.key === "L") tvLike();
 }
 
 tvShowEra();

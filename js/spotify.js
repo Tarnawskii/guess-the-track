@@ -22,6 +22,7 @@ function trackFromItem(item) {
     artUrl: (item.album && item.album.images && item.album.images[0]) ? item.album.images[0].url : null,
     albumId: item.album ? item.album.id : null,
     url: item.external_urls ? item.external_urls.spotify : "",
+    uri: item.uri || "",
     album: item.album ? item.album.name : "",
     duration: item.duration_ms || 0,
   };
