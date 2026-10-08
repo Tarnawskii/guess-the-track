@@ -45,7 +45,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 .crt-wires { z-index: 6; display: none; }
 /* the beam lines are drawn on a canvas, one row per physical pixel, lined up with the screen's pixel grid
    (a CSS gradient pattern smears into grey at 125% display scaling) */
-.crt-lines { z-index: 6; mix-blend-mode: multiply; width: 100%; opacity: 0.6; image-rendering: pixelated; }
+.crt-lines { z-index: 6; mix-blend-mode: multiply; width: 100%; opacity: 0.68; image-rendering: pixelated; }
 .crt-grille {
   z-index: 6; mix-blend-mode: multiply; opacity: 0.16;
   background: linear-gradient(90deg, #ff4040 0 33.3%, #40ff60 33.3% 66.6%, #4060ff 66.6%) 0 0 / var(--grille) 100% repeat;
@@ -246,6 +246,43 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 .tv-video { position: absolute; right: 0.5rem; bottom: 0.5rem; width: 7.5rem; height: 6.5rem; opacity: 0.01; pointer-events: none; }
 .tv-btn[hidden] { display: none; }
 #tvLayer.vpip .tv-btn[data-tv="pip"] { color: #ffc23d; }
+/* ---------- VHS: grain over the whole picture, a noisy tracking band crawling at the bottom, white dropouts
+   (placed by vhsDrops). Full on the 80s set, a little grain on the 70s and 90s ones, all of it with FX ---------- */
+.tv-screen { --grain: 0.1; }
+.crt-grain, .vhs-track, .vhs-drop { position: absolute; z-index: 5; pointer-events: none; }
+.crt-grain {
+  inset: 0; mix-blend-mode: screen; opacity: var(--grain);
+  background: var(--noise) 0 0 / 128px 128px repeat;
+  animation: vhs-grain 0.42s steps(1) infinite;
+}
+@keyframes vhs-grain {
+  0% { background-position: 0 0; } 17% { background-position: -37px 21px; } 33% { background-position: 53px -61px; }
+  50% { background-position: -88px -17px; } 67% { background-position: 19px 74px; } 83% { background-position: 101px -43px; }
+}
+.tv.strong .crt-grain { opacity: calc(var(--grain) * 1.8); }
+.vhs-track {
+  display: none; left: 0; right: 0; top: 88%; height: 7%; opacity: 0.42; mix-blend-mode: screen;
+  background: var(--streak) 0 0 / 300% 100%;
+  animation: vhs-track 9s ease-in-out infinite, vhs-streak 0.3s steps(1) infinite;
+}
+.vhs-track::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.5cqw;
+  background: rgba(255, 255, 255, 0.55); filter: blur(0.15cqw);
+}
+@keyframes vhs-track {
+  0%, 100% { transform: none; } 38% { transform: translateY(-30%); } 52% { transform: translateY(-230%); }
+  58% { transform: translateY(10%); } 80% { transform: translateY(-50%); }
+}
+@keyframes vhs-streak { 0% { background-position: 0 0; } 25% { background-position: 37% 0; } 50% { background-position: 81% 0; } 75% { background-position: 14% 0; } }
+.tv[data-era="80"] .vhs-track, .tv.strong .vhs-track { display: block; }
+.tv.strong .vhs-track { opacity: 0.62; }
+.vhs-drop {
+  display: none; height: 0.45cqw; filter: blur(0.1cqw);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.92) 12%, rgba(255, 255, 255, 0.7) 75%, transparent);
+  box-shadow: 4cqw 1.3cqw 0 -0.1cqw rgba(255, 255, 255, 0.5);
+}
+.vhs-drop.on { display: block; }
+
 /* ---------- big screen (⛶ or F): just the tube, as large as the window allows, black around it, for the TV,
    casting or AirPlay. The controls float over the bottom of the picture and fade out with the mouse ---------- */
 #tvLayer.big { padding: 0; background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -280,6 +317,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
    ghost to the right of everything; coarse lines over a dot mask; a dark hum bar creeping up; a rounder, more
    curved face. Changing channel snows longer and the picture rolls before it locks */
 .tv[data-era="70"] .tv-screen {
+  --grain: 0.12;
   --bloom-o: 0.62; --bloom-r: 1.1cqw; --bloom-c: 1.8;
   border-radius: 14% / 19%; clip-path: inset(0 round 14% / 19%);
   text-shadow: 0 0 0.8cqw currentColor, 1.1cqw 0 0.15cqw rgba(255, 236, 205, 0.16), 0.25cqw 0 0 rgba(255, 90, 40, 0.28);
@@ -315,6 +353,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
    with its two thin damper wires, almost square corners. It cuts to black between channels, shows a blue screen
    when there's nothing on, and has the big green outlined channel read-out */
 .tv[data-era="90"] .tv-screen {
+  --grain: 0.04;
   --bloom-o: 0.32; --bloom-r: 0.35cqw; --bloom-c: 2.2; --grille: max(2px, 0.26cqw);
   border-radius: 3% / 4%; clip-path: inset(0 round 3% / 4%);
   text-shadow: 0 0 0.45cqw currentColor;
@@ -350,7 +389,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
   .flame.out { animation: none; opacity: 0; }
   .cover-inner, .record, .field .v, .disc-label, .ta-arm { transition: none; }
   #cover.flipped .cover-back img, #ambient i { animation: none; }
-  .tv .tv-content, .tv.strong .tv-content, .tv-screen.rolling .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
+  .crt-grain, .vhs-track, .tv .tv-content, .tv.strong .tv-content, .tv-screen.rolling .tv-content, .tv.strong #tvArt, .vhs-top .pause, .crt-roll, .tv.strong .crt-lines { animation: none; }
   button:active { transform: none; }
   .rel.in, .mode-card.in, .tl-card.fresh, .tl-card.bad, #tlCards .slot { animation: none; }
 }

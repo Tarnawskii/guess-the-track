@@ -1,7 +1,7 @@
 // ---------- Just listen: the retro TV (its own pop-out window, or a full-page overlay where there's no PiP) ----------
 const tv = { clean: false, open: false, ch: 1, pip: null, key: null, queue: [], queueAt: 0, queueBusy: false, radarAsked: false, timer: 0, osdTimer: 0, fx: false };
 // the picture tube: a soft, warm, ghosty 70s set, the 80s one, or a sharp, vivid, flat 90s one
-const TV_ERAS = { 70: { lines: 180, gap: 0.42 }, 80: { lines: 220, gap: 0.4 }, 90: { lines: 300, gap: 0.34 } };
+const TV_ERAS = { 70: { lines: 180, gap: 0.42 }, 80: { lines: 220, gap: 0.46 }, 90: { lines: 300, gap: 0.34 } };
 tv.era = 80;
 try { const e = Number(localStorage.getItem("gtt_tv_era")); if (TV_ERAS[e]) tv.era = e; } catch {}
 try { tv.fx = localStorage.getItem("gtt_tv_fx") === "1"; tv.clean = localStorage.getItem("gtt_tv_clean") === "1"; } catch {}
@@ -9,7 +9,7 @@ const TV_CHANNELS = { 1: "NOW", 2: "TEXT", 3: "QUEUE", 4: "COVER" };
 try { const c = Number(localStorage.getItem("gtt_tv_ch")); if (TV_CHANNELS[c]) tv.ch = c; } catch {} // the TV remembers its channel
 // grabbed once: after the TV moves into its pop-out window, document.getElementById can't find it any more
 const T = {
-  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"), cap: $("tvCap"), hint: $("tvHint"),
+  layer: $("tvLayer"), box: $("tv"), screen: $("tvScreen"), now: $("tvNow"), fresh: $("tvNew"), queue: $("tvQueue"), cover: $("tvCover"), art: $("tvArt"), cap: $("tvCap"), hint: $("tvHint"), drop: $("tvDrop"),
   snow: $("tvStatic"), osd: $("tvOsd"), led: $("tvLed"), lines: $("tvLines"),
 };
 
@@ -152,11 +152,67 @@ function tvStartTicker() {
   if (tv.timer) (tv.timerWin || window).clearInterval(tv.timer);
   tv.timerWin = tvWin();
   tv.timer = tv.timerWin.setInterval(tvTick, 250);
+  vhsDrops();
+}
+
+// ---------- VHS: grain over everything, a noisy tracking band at the bottom and white dropouts flashing by ----------
+// Full on the 80s set, a little grain on the others, the lot with FX. The grain and the band's streaks are two small
+// textures made once and jumped around by CSS; only the dropouts need a timer
+let vhsNoise = null, vhsStreak = null;
+function vhsTextures() {
+  const make = (w, h, fill) => {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    const img = ctx.createImageData(w, h);
+    fill(img.data, w, h);
+    ctx.putImageData(img, 0, 0);
+    return c;
+  };
+  vhsNoise = make(128, 128, (d) => {
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.random() < 0.5 ? 0 : Math.random() * 255;
+      d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+    }
+  });
+  // runs of light and dark along each row: what a mistracked tape smears across the picture
+  vhsStreak = make(256, 24, (d, w, h) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w;) {
+        const run = 2 + Math.floor(Math.random() * 30);
+        const v = Math.random() < 0.35 ? 150 + Math.random() * 105 : Math.random() * 60;
+        for (let k = 0; k < run && x < w; k++, x++) { const i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      }
+    }
+  });
+  T.screen.style.setProperty("--noise", "url(" + vhsNoise.toDataURL() + ")");
+  T.screen.style.setProperty("--streak", "url(" + vhsStreak.toDataURL() + ")");
+}
+vhsTextures();
+
+function vhsDrops() {
+  const win = tvWin();
+  try { (tv.dropWin || window).clearTimeout(tv.dropTimer); } catch {}
+  tv.dropWin = win;
+  const flash = () => {
+    if (!tv.open) return;
+    if ((tv.era === 80 || tv.fx) && !reduceMotion.matches && !T.box.ownerDocument.hidden) {
+      const d = T.drop;
+      d.style.top = (8 + Math.random() * 84).toFixed(1) + "%";
+      d.style.left = (Math.random() * 50).toFixed(1) + "%";
+      d.style.width = (15 + Math.random() * 45).toFixed(1) + "%";
+      d.classList.add("on");
+      win.setTimeout(() => d.classList.remove("on"), 60 + Math.random() * 90);
+    }
+    tv.dropTimer = win.setTimeout(flash, (tv.fx ? 1200 : 2500) + Math.random() * (tv.fx ? 2500 : 5000));
+  };
+  tv.dropTimer = win.setTimeout(flash, 2000);
 }
 
 function tvStopped() {
   if (tv.big) tvBig(false);
   tv.open = false;
+  try { (tv.dropWin || window).clearTimeout(tv.dropTimer); } catch {}
   try { (tv.timerWin || window).clearInterval(tv.timer); } catch {}
   tv.timer = 0;
   vpipStop();
