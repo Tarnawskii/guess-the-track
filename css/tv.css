@@ -280,9 +280,8 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 .tv-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 .tv-screen.tearing { filter: url(#vhsTear); } /* the whole picture, so the cover and the text tear together */
 .vhs-drop {
-  display: none; height: 0.45cqw; filter: blur(0.1cqw);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.92) 12%, rgba(255, 255, 255, 0.7) 75%, transparent);
-  box-shadow: 4cqw 1.3cqw 0 -0.1cqw rgba(255, 255, 255, 0.5);
+  display: none; height: 0.35cqw; filter: blur(0.12cqw);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5) 15%, rgba(255, 255, 255, 0.35) 75%, transparent);
 }
 .vhs-drop.on { display: block; }
 

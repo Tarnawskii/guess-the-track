@@ -235,12 +235,15 @@ function vhsDrops() {
   const flash = () => {
     if (!tv.open) return;
     if ((tv.era === 80 || tv.fx) && !reduceMotion.matches && !T.box.ownerDocument.hidden) {
-      const d = T.drop;
-      d.style.top = (8 + Math.random() * 84).toFixed(1) + "%";
-      d.style.left = (Math.random() * 50).toFixed(1) + "%";
-      d.style.width = (15 + Math.random() * 45).toFixed(1) + "%";
-      d.classList.add("on");
-      win.setTimeout(() => d.classList.remove("on"), 60 + Math.random() * 90);
+      // a white dropout only now and then (about every half minute, every ~8 s with FX): any more is just noise
+      if (Math.random() < (tv.fx ? 0.3 : 0.15)) {
+        const d = T.drop;
+        d.style.top = (8 + Math.random() * 84).toFixed(1) + "%";
+        d.style.left = (Math.random() * 50).toFixed(1) + "%";
+        d.style.width = (12 + Math.random() * 35).toFixed(1) + "%";
+        d.classList.add("on");
+        win.setTimeout(() => d.classList.remove("on"), 50 + Math.random() * 60);
+      }
       if (Math.random() < (tv.fx ? 0.45 : 0.25)) win.setTimeout(vhsTear, Math.random() * 900);
     }
     tv.dropTimer = win.setTimeout(flash, (tv.fx ? 1200 : 2500) + Math.random() * (tv.fx ? 2500 : 5000));
