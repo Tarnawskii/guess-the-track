@@ -176,11 +176,11 @@ function vhsTextures() {
     }
   });
   // runs of light and dark along each row: what a mistracked tape smears across the picture
-  vhsStreak = make(256, 24, (d, w, h) => {
+  vhsStreak = make(256, 6, (d, w, h) => {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w;) {
-        const run = 2 + Math.floor(Math.random() * 30);
-        const v = Math.random() < 0.35 ? 150 + Math.random() * 105 : Math.random() * 60;
+        const run = 6 + Math.floor(Math.random() * 64);
+        const v = Math.random() < 0.3 ? 110 + Math.random() * 90 : Math.random() * 40;
         for (let k = 0; k < run && x < w; k++, x++) { const i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
       }
     }
@@ -189,6 +189,44 @@ function vhsTextures() {
   T.screen.style.setProperty("--streak", "url(" + vhsStreak.toDataURL() + ")");
 }
 vhsTextures();
+
+// tearing: for a moment two to four bands of lines are torn sideways, slanting as the tape catches up, and jump
+// about as it slips. Each step draws a new displacement map: a column of rows, grey = stay, lighter = right
+let tearCanvas = null;
+function vhsTearMap() {
+  const H = 96;
+  const c = tearCanvas || (tearCanvas = document.createElement("canvas"));
+  c.width = 2; c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "rgb(128,128,0)";
+  ctx.fillRect(0, 0, 2, H);
+  for (let b = 2 + Math.floor(Math.random() * 3); b > 0; b--) {
+    const y = Math.floor(Math.random() * H), h = 3 + Math.floor(Math.random() * 16);
+    const off = (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.7);
+    for (let k = 0; k < h; k++) {
+      ctx.fillStyle = "rgb(" + Math.round(128 + off * 127 * (0.75 + 0.25 * k / h)) + ",128,0)";
+      ctx.fillRect(0, y + k, 2, 1);
+    }
+  }
+  return c.toDataURL();
+}
+
+function vhsTear() {
+  if (reduceMotion.matches || T.box.ownerDocument.hidden) return;
+  const map = T.box.querySelector("#vhsTear feImage"), disp = T.box.querySelector("#vhsTear feDisplacementMap");
+  if (!map || !disp) return;
+  const win = tvWin(), s = T.screen;
+  let n = 2 + Math.floor(Math.random() * 4);
+  tv.tearUntil = Date.now() + n * 75;
+  const step = () => {
+    map.setAttribute("href", vhsTearMap());
+    disp.setAttribute("scale", ((tv.fx ? 0.18 : 0.12) + Math.random() * 0.08).toFixed(3));
+    s.classList.add("tearing");
+    if (--n > 0) win.setTimeout(step, 50 + Math.random() * 60);
+    else win.setTimeout(() => s.classList.remove("tearing"), 50 + Math.random() * 70);
+  };
+  step();
+}
 
 function vhsDrops() {
   const win = tvWin();
@@ -203,6 +241,7 @@ function vhsDrops() {
       d.style.width = (15 + Math.random() * 45).toFixed(1) + "%";
       d.classList.add("on");
       win.setTimeout(() => d.classList.remove("on"), 60 + Math.random() * 90);
+      if (Math.random() < (tv.fx ? 0.45 : 0.25)) win.setTimeout(vhsTear, Math.random() * 900);
     }
     tv.dropTimer = win.setTimeout(flash, (tv.fx ? 1200 : 2500) + Math.random() * (tv.fx ? 2500 : 5000));
   };

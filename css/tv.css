@@ -67,10 +67,9 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
     radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.6) 100%),
     linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 22%, transparent 34%);
 }
-.tv.strong .tv-content { animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite; }
+.tv.strong .tv-content { animation: tv-flicker 0.14s steps(2) infinite; }
 .tv.strong .tv-screen { text-shadow: 0 0 1cqw currentColor, 0.45cqw 0 0 rgba(255, 30, 80, 0.45), -0.45cqw 0 0 rgba(0, 170, 255, 0.45); }
 @keyframes tv-flicker { 50% { opacity: 0.94; } }
-@keyframes tv-jitter { 0%, 92%, 100% { transform: none; } 94% { transform: translateX(0.4cqw) skewX(-1deg); } 96% { transform: translateX(-0.3cqw); } }
 .tv-content { position: absolute; inset: 0; transform-origin: 50% 50%; }
 .tv-screen.power-on .tv-content { animation: tv-on 750ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .tv-screen.power-off .tv-content { animation: tv-off 420ms cubic-bezier(0.6, 0, 0.8, 0.4) both; }
@@ -112,7 +111,7 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
 }
 .tv.strong #tvArt {
   filter: saturate(1.35) contrast(1.12) drop-shadow(0.35cqw 0 0 rgba(255, 30, 80, 0.4)) drop-shadow(-0.35cqw 0 0 rgba(0, 170, 255, 0.4));
-  animation: tv-flicker 0.14s steps(2) infinite, tv-jitter 6s ease-in-out infinite;
+  animation: tv-flicker 0.14s steps(2) infinite;
 }
 .tv[data-ch="1"] #tvArt.has, .tv[data-ch="4"] #tvArt.has { display: block; }
 /* CH4: the cover, big, on its own colours (Spotify allows backgrounds taken from the artwork's colours) */
@@ -260,22 +259,26 @@ body.tv-pip .tv { width: min(100vw - 1rem, (100vh - 1rem) * 1.14); }
   50% { background-position: -88px -17px; } 67% { background-position: 19px 74px; } 83% { background-position: 101px -43px; }
 }
 .tv.strong .crt-grain { opacity: calc(var(--grain) * 1.8); }
+/* the tracking band: a few coarse, soft streaks low on the picture that twitch a line or two at a time */
 .vhs-track {
-  display: none; left: 0; right: 0; top: 88%; height: 7%; opacity: 0.42; mix-blend-mode: screen;
+  display: none; left: 0; right: 0; top: 90%; height: 5%; opacity: 0.22; mix-blend-mode: screen;
   background: var(--streak) 0 0 / 300% 100%;
-  animation: vhs-track 9s ease-in-out infinite, vhs-streak 0.3s steps(1) infinite;
+  animation: vhs-track 2.4s steps(1) infinite, vhs-streak 0.16s steps(1) infinite;
 }
 .vhs-track::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.5cqw;
-  background: rgba(255, 255, 255, 0.55); filter: blur(0.15cqw);
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.3cqw;
+  background: rgba(255, 255, 255, 0.28); filter: blur(0.15cqw);
 }
 @keyframes vhs-track {
-  0%, 100% { transform: none; } 38% { transform: translateY(-30%); } 52% { transform: translateY(-230%); }
-  58% { transform: translateY(10%); } 80% { transform: translateY(-50%); }
+  0% { transform: none; } 20% { transform: translateY(-14%); } 40% { transform: translateY(8%); }
+  60% { transform: translateY(-26%); } 80% { transform: translateY(4%); }
 }
 @keyframes vhs-streak { 0% { background-position: 0 0; } 25% { background-position: 37% 0; } 50% { background-position: 81% 0; } 75% { background-position: 14% 0; } }
 .tv[data-era="80"] .vhs-track, .tv.strong .vhs-track { display: block; }
-.tv.strong .vhs-track { opacity: 0.62; }
+.tv.strong .vhs-track { opacity: 0.34; }
+/* tearing: the picture itself torn sideways in bands for a moment (the filter is in the page, vhsTear() runs it) */
+.tv-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.tv-screen.tearing { filter: url(#vhsTear); } /* the whole picture, so the cover and the text tear together */
 .vhs-drop {
   display: none; height: 0.45cqw; filter: blur(0.1cqw);
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.92) 12%, rgba(255, 255, 255, 0.7) 75%, transparent);

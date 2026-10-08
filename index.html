@@ -171,6 +171,14 @@
 <div id="tvLayer" aria-hidden="true">
   <div class="tv-hint" id="tvHint" role="status" hidden></div>
   <div class="tv" id="tv" data-ch="1" role="dialog" aria-label="Just listen — retro TV">
+    <!-- VHS tearing (vhsTear): a few bands of lines torn sideways, drawn by vhsTearMap(). It lives inside the set so
+         it goes along into the pop-out window, where url(#vhsTear) has to find it -->
+    <svg class="tv-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id="vhsTear" x="-10%" y="0" width="120%" height="1" primitiveUnits="objectBoundingBox" color-interpolation-filters="sRGB">
+        <feImage x="0" y="0" width="1" height="1" preserveAspectRatio="none" href="" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="0.16" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
     <div class="tv-body">
       <div class="tv-bezel">
         <div class="tv-screen" id="tvScreen">
