@@ -145,6 +145,13 @@ function drawTvFrame() {
     ctx.globalCompositeOperation = "source-over";
   }
   if (era === 90) { ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; ctx.fillRect(S.x, S.y + S.h / 3, S.w, 1); ctx.fillRect(S.x, S.y + S.h * 2 / 3, S.w, 1); }
+  // tearing: bands of the picture copied back onto itself, shifted sideways
+  if (Date.now() < (tv.tearUntil || 0)) {
+    for (let i = 0; i < 5; i++) {
+      const y = S.y + Math.random() * S.h, h = 6 + Math.random() * 30, off = (Math.random() - 0.5) * 50;
+      ctx.drawImage(vpip.canvas, S.x, y, S.w, h, S.x + off, y, S.w, h);
+    }
+  }
   // VHS: grain everywhere, and on the 80s set (or with FX) the tracking band crawling along the bottom
   if (vhsNoise && !reduceMotion.matches) {
     ctx.globalCompositeOperation = "screen";
@@ -152,10 +159,10 @@ function drawTvFrame() {
     const ox = Math.floor(Math.random() * 128), oy = Math.floor(Math.random() * 128);
     for (let y = S.y - oy; y < S.y + S.h; y += 128) for (let x = S.x - ox; x < S.x + S.w; x += 128) ctx.drawImage(vhsNoise, x, y);
     if (era === 80 || tv.fx) {
-      const h = S.h * 0.07, y = S.y + S.h * (0.88 + 0.02 * Math.sin(Date.now() / 1400));
-      ctx.globalAlpha = tv.fx ? 0.62 : 0.42;
-      ctx.drawImage(vhsStreak, Math.floor(Math.random() * 170), 0, 86, 24, S.x, y, S.w, h);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.fillRect(S.x, y, S.w, 2);
+      const h = S.h * 0.05, y = S.y + S.h * 0.9 + [0, -3, 2, -5, 1][Math.floor(Date.now() / 480) % 5];
+      ctx.globalAlpha = tv.fx ? 0.34 : 0.22;
+      ctx.drawImage(vhsStreak, Math.floor(Math.random() * 170), 0, 86, 6, S.x, y, S.w, h);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.28)"; ctx.fillRect(S.x, y, S.w, 1);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
