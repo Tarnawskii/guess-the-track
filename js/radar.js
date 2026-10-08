@@ -5,11 +5,16 @@ const RADAR_TTL = 6 * 3600e3;   // cached this long, Refresh skips it
 const radar = { open: false, loading: false, done: 0, total: 0, artists: 0, failed: 0, releases: [], at: 0, error: "", flash: "", days: 30, since: "", shown: new Set() };
 let radarRenderTimer = 0;
 
-function radarScopeOk() {
+// did the last login grant these? (features added later need one more login for their permissions)
+function hasScopes(list) {
   try {
     const granted = (JSON.parse(localStorage.getItem("pip_widget_auth")).scope || "").split(" ");
-    return RADAR_SCOPES.every((s) => granted.includes(s));
+    return list.every((s) => granted.includes(s));
   } catch { return false; }
+}
+
+function radarScopeOk() {
+  return hasScopes(RADAR_SCOPES);
 }
 
 // local calendar day, n days back, as Spotify writes release dates: YYYY-MM-DD

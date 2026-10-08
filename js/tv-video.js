@@ -126,6 +126,7 @@ function drawTvFrame() {
     vpipText(ctx, t.song, tx, A.y + 46, 40, "#ffe95c", tw, 2);
     vpipText(ctx, t.artists.join(", "), tx, A.y + 132, 30, "#7ff6ff", tw);
     vpipText(ctx, t.album || "", tx, A.y + 168, 24, "#9fb7aa", tw);
+    if (likes.key === state.trackKey && likes.on) vpipText(ctx, "♥ LIKED", tx, A.y + 202, 24, "#ff3d7f", tw);
     const next = tv.queue && tv.queue.find((q) => q.id !== state.trackKey); // the queue can lag a song behind
     if (next) vpipText(ctx, "NEXT ▸ " + next.name, S.x + 34, S.y + 312, 24, "#4dff86", S.w - 68);
     const at = Math.min(currentElapsed(), state.trackDuration || 0);

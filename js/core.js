@@ -4,7 +4,7 @@
 const CONFIG = {
   spotifyClientId: "fb91c824fe804c50a8b4b244288ebc6f",
   redirectUri: location.origin + location.pathname,
-  scopes: "user-read-currently-playing user-read-playback-state user-modify-playback-state user-top-read",
+  scopes: "user-read-currently-playing user-read-playback-state user-modify-playback-state user-top-read user-library-read user-library-modify",
   pollMs: 5000,
 };
 
